@@ -991,7 +991,7 @@ const VOICE_STORE = 'recordings';
 const voiceState = {
   list: [], idx: 0, term: null, stream: null, recorder: null, chunks: [], blob: null, url: null, loadToken: 0,
   recognition: null, recognitionTimer: null, pendingScore: null, scoreError: '', recordingDone: false,
-  recognitionDone: false, recordingSaved: false, sessionFinalized: false
+  recognitionDone: false, recordingSaved: false, sessionFinalized: false, fallbackAttempted: false
 };
 let voiceDbPromise = null;
 
@@ -1198,7 +1198,7 @@ function beginAutomaticRecognition(x) {
   const recognition = new Recognition();
   recognition.lang = 'en-GB';
   recognition.continuous = false;
-  recognition.interimResults = false;
+  recognition.interimResults = true;
   recognition.maxAlternatives = 5;
   voiceState.recognition = recognition;
 
@@ -1257,10 +1257,95 @@ function saveAutomaticScore(x, result) {
   save();
 }
 
+function beginPostRecordingRecognition(x) {
+  voiceState.fallbackAttempted = true;
+  voiceState.recognitionDone = false;
+  voiceState.scoreError = '';
+  voiceState.pendingScore = null;
+  if (voiceState.recognitionTimer) clearTimeout(voiceState.recognitionTimer);
+  voiceState.recognitionTimer = null;
+  if (voiceState.recognition) {
+    const previousRecognition = voiceState.recognition;
+    previousRecognition.onend = null;
+    previousRecognition.onerror = null;
+    previousRecognition.onresult = null;
+    try { previousRecognition.abort(); } catch (error) { /* 已结束，无需处理 */ }
+    voiceState.recognition = null;
+  }
+
+  const Recognition = speechRecognitionConstructor();
+  if (!window.isSecureContext || !Recognition) {
+    voiceState.recognitionDone = true;
+    voiceState.scoreError = !window.isSecureContext ? '自动评分需要 HTTPS 地址。' : '当前浏览器不支持语音识别评分。';
+    maybeFinalizeVoiceSession();
+    return;
+  }
+
+  const recognition = new Recognition();
+  recognition.lang = 'en-GB';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 5;
+  voiceState.recognition = recognition;
+  const recordButton = document.getElementById('voice-record');
+  recordButton.disabled = true;
+  recordButton.textContent = '🎯 请再读一遍，正在自动评分…';
+  document.getElementById('voice-status').className = 'voice-status recording';
+  document.getElementById('voice-status').textContent = `录音已结束。为了兼容 iPad，请现在再朗读一次“${x.w}”`;
+  showVoiceScore(null, `请再朗读：${x.w}`, '无需点击按钮，读完后会自动显示分数。');
+
+  recognition.onresult = event => {
+    const result = event.results[event.resultIndex || 0];
+    let best = voiceState.pendingScore || { score: 0, transcript: '', confidence: 0 };
+    for (let i = 0; i < result.length; i++) {
+      const alternative = result[i];
+      const confidence = Number(alternative.confidence) || 0;
+      const score = speechMatchScore(x.w, alternative.transcript, confidence);
+      if (score > best.score) best = { score: score, transcript: alternative.transcript, confidence: confidence };
+    }
+    voiceState.pendingScore = best;
+  };
+
+  recognition.onerror = event => {
+    const messages = {
+      'no-speech': '没有听到第二次朗读，请靠近麦克风再试。',
+      'not-allowed': '语音识别权限被拒绝，请使用普通 Safari 并允许麦克风。',
+      'audio-capture': 'iPad 没有释放麦克风，请重新打开页面再试。',
+      'network': '语音识别需要网络，请检查网络后重试。'
+    };
+    voiceState.scoreError = messages[event.error] || 'iPad Safari 没有返回识别结果。';
+  };
+
+  recognition.onend = () => {
+    if (voiceState.recognitionTimer) clearTimeout(voiceState.recognitionTimer);
+    voiceState.recognitionTimer = null;
+    voiceState.recognition = null;
+    voiceState.recognitionDone = true;
+    maybeFinalizeVoiceSession();
+  };
+
+  try {
+    recognition.start();
+    voiceState.recognitionTimer = setTimeout(() => {
+      if (voiceState.recognition === recognition) recognition.stop();
+    }, 10000);
+  } catch (error) {
+    voiceState.recognition = null;
+    voiceState.recognitionDone = true;
+    voiceState.scoreError = 'iPad Safari 无法启动第二次语音识别，请使用普通 Safari 页面。';
+    maybeFinalizeVoiceSession();
+  }
+}
+
 function maybeFinalizeVoiceSession() {
   if (!voiceState.recordingDone || !voiceState.recognitionDone || voiceState.sessionFinalized) return;
-  voiceState.sessionFinalized = true;
   const x = BY_ID[voiceState.recordingId];
+  const unrecoverable = /HTTPS|不支持|权限被拒绝/.test(voiceState.scoreError || '');
+  if (!voiceState.pendingScore && canScoreSpeech() && !voiceState.fallbackAttempted && !unrecoverable) {
+    beginPostRecordingRecognition(x);
+    return;
+  }
+  voiceState.sessionFinalized = true;
   const status = document.getElementById('voice-status');
   const recordButton = document.getElementById('voice-record');
   recordButton.disabled = false;
@@ -1308,6 +1393,7 @@ async function startVoiceRecording() {
     voiceState.recognitionDone = false;
     voiceState.recordingSaved = false;
     voiceState.sessionFinalized = false;
+    voiceState.fallbackAttempted = false;
     voiceState.pendingScore = null;
     voiceState.scoreError = '';
 
