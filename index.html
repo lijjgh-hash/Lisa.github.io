@@ -12,6 +12,9 @@
   header { width:100%; max-width:440px; text-align:center; margin-bottom:12px; }
   header h1 { font-size:21px; }
   header .motto { font-size:12px; color:var(--gray); margin-top:4px; }
+  .term-picker { display:flex; justify-content:center; align-items:center; gap:7px; margin-top:9px; }
+  .term-picker label { font-size:13px; color:var(--gray); }
+  .term-picker select { width:auto; min-width:132px; margin:0; padding:6px 28px 6px 10px; border-color:#93c5fd; color:var(--primary); font-weight:700; }
   .streak-bar { display:flex; justify-content:center; gap:14px; margin-top:8px; font-size:13px; }
   .streak-bar b { color:var(--primary); font-size:16px; }
 
@@ -61,6 +64,20 @@
   .feedback { min-height:24px; font-weight:700; margin:6px 0; text-align:center; }
   .ok { color:var(--green); } .bad { color:var(--red); }
 
+  /* 互动练习 */
+  .practice-settings { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .practice-settings select { margin-bottom:8px; }
+  .quiz-meta { display:flex; justify-content:space-between; color:var(--gray); font-size:13px; margin-bottom:8px; }
+  .quiz-prompt { font-size:26px; font-weight:700; color:var(--primary); line-height:1.45; margin:18px 0 10px; }
+  .quiz-prompt.sentence { font-size:21px; }
+  .quiz-options { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:12px; }
+  .quiz-option { min-height:52px; padding:9px 6px; border:2px solid #bfdbfe; border-radius:12px; background:#fff;
+                 color:var(--text); font-size:16px; font-weight:600; cursor:pointer; overflow-wrap:anywhere; }
+  .quiz-option:disabled { opacity:1; cursor:default; }
+  .quiz-option.correct-answer { background:#dcfce7; border-color:var(--green); color:#166534; }
+  .quiz-option.wrong-answer { background:#ffe4e6; border-color:var(--red); color:#9f1239; }
+  .score-big { font-size:42px; font-weight:800; color:var(--primary); margin:8px 0; }
+
   /* 单词表 */
   .unit-title { background:var(--primary); color:#fff; border-radius:10px 10px 0 0; padding:8px 12px; font-weight:700; margin-top:12px;
                 display:flex; justify-content:space-between; font-size:15px; }
@@ -92,8 +109,15 @@
 <body>
 
 <header>
-  <h1>📒 一年级上册 · 单词打卡</h1>
+  <h1 id="app-title">📒 一年级上册 · 单词打卡</h1>
   <div class="motto">An apple a day keeps the doctor away. 每天一个苹果，医生远离我。</div>
+  <div class="term-picker">
+    <label for="term-select">选择教材</label>
+    <select id="term-select" aria-label="选择上册或下册">
+      <option value="1A">一年级上册</option>
+      <option value="1B">一年级下册</option>
+    </select>
+  </div>
   <div class="streak-bar">
     <span>🔥 连续 <b id="hd-streak">0</b> 天</span>
     <span>✅ 已掌握 <b id="hd-mastered">0</b>/<span id="hd-total">0</span></span>
@@ -103,6 +127,7 @@
 <nav class="tabs">
   <button class="tab active" data-tab="today">今日打卡</button>
   <button class="tab" data-tab="list">单词表</button>
+  <button class="tab" data-tab="practice">练习</button>
   <button class="tab" data-tab="dictation">默写</button>
   <button class="tab" data-tab="record">打卡记录</button>
 </nav>
@@ -123,6 +148,27 @@
 <section id="page-list" class="page">
   <div class="hint" style="text-align:center">点单词听发音；点方框可手动打卡（对应纸质表的 5 个格子）</div>
   <div id="word-list"></div>
+</section>
+
+<!-- 互动练习 -->
+<section id="page-practice" class="page">
+  <div class="practice-settings">
+    <select id="practice-unit" aria-label="选择练习范围"></select>
+    <select id="practice-type" aria-label="选择练习题型">
+      <option value="mixed">综合练习</option>
+      <option value="meaning">看中文选英文</option>
+      <option value="listening">听音选单词</option>
+      <option value="sentence">例句选词填空</option>
+    </select>
+  </div>
+  <button class="btn btn-primary" id="practice-start" style="width:100%;margin-bottom:12px">开始练习</button>
+  <div id="practice-area">
+    <div class="card">
+      <div class="celebrate" style="font-size:44px">✏️</div>
+      <div class="cn">选择范围和题型，开始练习吧！</div>
+      <div class="hint">每轮最多 10 题，答错会自动加入错题本。</div>
+    </div>
+  </div>
 </section>
 
 <!-- 默写 -->
@@ -235,6 +281,74 @@ const RAW = [
   [10,"six","six","/sɪks/","六"]
 ];
 
+// 一年级下册（根据用户提供的教材 Word bank 图片录入）
+const RAW_B = [
+  [1,"fine","fine","/faɪn/","健康的；身体很好的"],
+  [1,"busy","bus-y","/ˈbɪzi/","忙碌的"],
+  [1,"tired","tired","/ˈtaɪəd/","疲倦的"],
+  [1,"happy","hap-py","/ˈhæpi/","高兴的"],
+  [1,"great","great","/ɡreɪt/","身心健康的；心情愉快的"],
+  [2,"lunch","lunch","/lʌntʃ/","午餐；午饭"],
+  [2,"time","time","/taɪm/","时间"],
+  [2,"meatball","meat-ball","/ˈmiːtbɔːl/","肉丸"],
+  [2,"rice","rice","/raɪs/","大米；稻米"],
+  [2,"vegetable","veg-e-ta-ble","/ˈvedʒtəbl/","蔬菜"],
+  [2,"soup","soup","/suːp/","汤；羹"],
+  [2,"apple","ap-ple","/ˈæpl/","苹果"],
+  [3,"colour","col-our","/ˈkʌlə(r)/","颜色；色彩"],
+  [3,"yellow","yel-low","/ˈjeləʊ/","黄色的"],
+  [3,"red","red","/red/","红色的"],
+  [3,"blue","blue","/bluː/","蓝色的"],
+  [3,"green","green","/ɡriːn/","绿色的"],
+  [4,"playground","play-ground","/ˈpleɪɡraʊnd/","（尤指公园中的）游乐场"],
+  [4,"slide","slide","/slaɪd/","滑梯"],
+  [4,"swing","swing","/swɪŋ/","秋千"],
+  [4,"seesaw","see-saw","/ˈsiːsɔː/","跷跷板"],
+  [4,"hold on tight","hold on tight","/həʊld ɒn taɪt/","紧紧抓住"],
+  [4,"be careful","be care-ful","/biː ˈkeəfl/","小心；注意"],
+  [5,"weather","weath-er","/ˈweðə(r)/","天气；气象"],
+  [5,"sunny","sun-ny","/ˈsʌni/","阳光充足的"],
+  [5,"rainy","rain-y","/ˈreɪni/","阴雨的；多雨的"],
+  [5,"windy","wind-y","/ˈwɪndi/","多风的；风大的"],
+  [5,"cloudy","cloud-y","/ˈklaʊdi/","阴天的；多云的"],
+  [5,"snowy","snow-y","/ˈsnəʊi/","下雪的；多雪的"],
+  [6,"clothes","clothes","/kləʊðz/","衣服；服装"],
+  [6,"shirt","shirt","/ʃɜːt/","（尤指男式的）衬衫"],
+  [6,"trousers","trou-sers","/ˈtraʊzəz/","裤子"],
+  [6,"sock","sock","/sɒk/","短袜"],
+  [6,"shoe","shoe","/ʃuː/","鞋"],
+  [6,"hat","hat","/hæt/","（常指带檐的）帽子"],
+  [6,"skirt","skirt","/skɜːt/","女裙；裙子"],
+  [6,"dress","dress","/dres/","连衣裙"],
+  [7,"game","game","/ɡeɪm/","游戏；运动；比赛项目"],
+  [7,"hide-and-seek","hide-and-seek","/ˌhaɪd ən ˈsiːk/","捉迷藏游戏"],
+  [7,"ready","read-y","/ˈredi/","准备好"],
+  [7,"play","play","/pleɪ/","玩耍；游戏；玩乐"],
+  [7,"move-and-freeze","move-and-freeze","/muːv ən friːz/","木头人游戏"],
+  [7,"skip rope","skip rope","/skɪp rəʊp/","跳绳"],
+  [7,"throw sandbags","throw sand-bags","/θrəʊ ˈsændbæɡz/","丢沙包"],
+  [8,"traffic light","traf-fic light","/ˈtræfɪk laɪt/","交通信号灯"],
+  [8,"stop","stop","/stɒp/","（使）停止；停下"],
+  [8,"go","go","/ɡəʊ/","去；走"],
+  [8,"wait","wait","/weɪt/","等；等候"],
+  [8,"zebra crossing","ze-bra cross-ing","/ˌzebrə ˈkrɒsɪŋ/","斑马线；人行横道"],
+  [9,"panda","pan-da","/ˈpændə/","大熊猫"],
+  [9,"see","see","/siː/","看见"],
+  [9,"look at","look at","/lʊk æt/","看"],
+  [9,"tiger","ti-ger","/ˈtaɪɡə(r)/","虎；老虎"],
+  [9,"elephant","el-e-phant","/ˈelɪfənt/","象"],
+  [9,"monkey","mon-key","/ˈmʌŋki/","猴子"],
+  [9,"climb a tree","climb a tree","/klaɪm ə triː/","爬树"],
+  [9,"swim","swim","/swɪm/","游水；游泳"],
+  [10,"kite","kite","/kaɪt/","风筝"],
+  [10,"toy car","toy car","/tɔɪ kɑː(r)/","玩具汽车"],
+  [10,"toy boat","toy boat","/tɔɪ bəʊt/","玩具船"],
+  [10,"ball","ball","/bɔːl/","球"],
+  [10,"cute","cute","/kjuːt/","可爱的；漂亮迷人的"],
+  [10,"gift","gift","/ɡɪft/","礼物"],
+  [10,"toy train","toy train","/tɔɪ treɪn/","玩具火车"]
+];
+
 // 简短例句：适合一年级朗读，每个教材词或词组各一条
 const EXAMPLES = {
   "morning": ["Good morning, Mum.", "早上好，妈妈。"],
@@ -298,12 +412,86 @@ const EXAMPLES = {
   "six": ["There are six chairs.", "这里有六把椅子。"]
 };
 
-const WORDS = RAW.map((r, i) => ({
-  id: i + 1, unit: r[0], w: r[1], syl: r[2], ipa: r[3], cn: r[4],
-  example: EXAMPLES[r[1]][0], exampleCn: EXAMPLES[r[1]][1]
-}));
+const EXAMPLES_B = {
+  "fine": ["I am fine today.", "我今天很好。"],
+  "busy": ["Mum is busy.", "妈妈很忙。"],
+  "tired": ["I am tired.", "我累了。"],
+  "happy": ["I am happy.", "我很高兴。"],
+  "great": ["You look great.", "你看起来状态很好。"],
+  "lunch": ["It is time for lunch.", "到吃午饭的时间了。"],
+  "time": ["What time is it?", "现在几点了？"],
+  "meatball": ["This is a meatball.", "这是一个肉丸。"],
+  "rice": ["I like rice.", "我喜欢米饭。"],
+  "vegetable": ["This is a vegetable.", "这是一种蔬菜。"],
+  "soup": ["The soup is warm.", "汤是温的。"],
+  "apple": ["This is a red apple.", "这是一个红苹果。"],
+  "colour": ["What colour is it?", "它是什么颜色？"],
+  "yellow": ["The kite is yellow.", "风筝是黄色的。"],
+  "red": ["My ball is red.", "我的球是红色的。"],
+  "blue": ["I have a blue shirt.", "我有一件蓝色衬衫。"],
+  "green": ["The tree is green.", "这棵树是绿色的。"],
+  "playground": ["We play in the playground.", "我们在游乐场玩。"],
+  "slide": ["I play on the slide.", "我在滑梯上玩。"],
+  "swing": ["I like the swing.", "我喜欢秋千。"],
+  "seesaw": ["We play on the seesaw.", "我们玩跷跷板。"],
+  "hold on tight": ["Hold on tight, please.", "请紧紧抓住。"],
+  "be careful": ["Be careful on the slide.", "在滑梯上要小心。"],
+  "weather": ["How is the weather?", "天气怎么样？"],
+  "sunny": ["It is sunny today.", "今天阳光明媚。"],
+  "rainy": ["It is a rainy day.", "今天是个雨天。"],
+  "windy": ["It is windy today.", "今天风很大。"],
+  "cloudy": ["It is cloudy today.", "今天多云。"],
+  "snowy": ["It is a snowy day.", "今天是个雪天。"],
+  "clothes": ["These are my clothes.", "这些是我的衣服。"],
+  "shirt": ["This is my shirt.", "这是我的衬衫。"],
+  "trousers": ["My trousers are blue.", "我的裤子是蓝色的。"],
+  "sock": ["This is my sock.", "这是我的短袜。"],
+  "shoe": ["This is my shoe.", "这是我的鞋。"],
+  "hat": ["I have a red hat.", "我有一顶红帽子。"],
+  "skirt": ["Her skirt is yellow.", "她的裙子是黄色的。"],
+  "dress": ["This dress is cute.", "这条连衣裙很可爱。"],
+  "game": ["Let us play a game.", "让我们玩个游戏。"],
+  "hide-and-seek": ["We play hide-and-seek.", "我们玩捉迷藏。"],
+  "ready": ["I am ready.", "我准备好了。"],
+  "play": ["I play with my friends.", "我和朋友们一起玩。"],
+  "move-and-freeze": ["Let us play move-and-freeze.", "让我们玩木头人游戏。"],
+  "skip rope": ["I can skip rope.", "我会跳绳。"],
+  "throw sandbags": ["We throw sandbags.", "我们丢沙包。"],
+  "traffic light": ["Look at the traffic light.", "看交通信号灯。"],
+  "stop": ["Stop at the red light.", "红灯时停下。"],
+  "go": ["Go at the green light.", "绿灯时通行。"],
+  "wait": ["Wait for the green light.", "等绿灯亮。"],
+  "zebra crossing": ["Walk on the zebra crossing.", "走斑马线。"],
+  "panda": ["I see a panda.", "我看见一只大熊猫。"],
+  "see": ["I can see a bird.", "我能看见一只鸟。"],
+  "look at": ["Look at the tiger.", "看那只老虎。"],
+  "tiger": ["The tiger is big.", "这只老虎很大。"],
+  "elephant": ["The elephant has a long nose.", "大象有一个长鼻子。"],
+  "monkey": ["The monkey is in the tree.", "猴子在树上。"],
+  "climb a tree": ["The monkey can climb a tree.", "猴子会爬树。"],
+  "swim": ["I can swim.", "我会游泳。"],
+  "kite": ["I have a kite.", "我有一只风筝。"],
+  "toy car": ["This is my toy car.", "这是我的玩具汽车。"],
+  "toy boat": ["The toy boat is blue.", "玩具船是蓝色的。"],
+  "ball": ["I play with a ball.", "我玩球。"],
+  "cute": ["The cat is cute.", "这只猫很可爱。"],
+  "gift": ["This gift is for you.", "这份礼物送给你。"],
+  "toy train": ["I have a toy train.", "我有一辆玩具火车。"]
+};
+Object.assign(EXAMPLES, EXAMPLES_B);
+
+function makeWords(rows, term, startId) {
+  return rows.map((r, i) => ({
+    id: startId + i, no: i + 1, term: term, unit: r[0], w: r[1], syl: r[2], ipa: r[3], cn: r[4],
+    example: EXAMPLES[r[1]][0], exampleCn: EXAMPLES[r[1]][1]
+  }));
+}
+const WORDS = makeWords(RAW, '1A', 1).concat(makeWords(RAW_B, '1B', RAW.length + 1));
 const BY_ID = WORDS.reduce((map, word) => { map[word.id] = word; return map; }, {});
-const UNITS = [...new Set(WORDS.map(x => x.unit))];
+
+function currentTerm() { return data && data.term === '1B' ? '1B' : '1A'; }
+function activeWords() { const term = currentTerm(); return WORDS.filter(x => x.term === term); }
+function activeUnits() { return [...new Set(activeWords().map(x => x.unit))]; }
 
 // 艾宾浩斯：第 n 格打完后，间隔 INTERVALS[n-1] 天再复习；5 格满 = 掌握
 const INTERVALS = [1, 2, 4, 7];
@@ -311,7 +499,7 @@ const MAX_STAGE = 5;
 
 // ================= 存储 =================
 const KEY = 'word_checkin_v1';
-const defaultData = () => ({ goal: 5, progress: {}, checkins: {}, mistakes: [], daily: null });
+const defaultData = () => ({ term: '1A', goal: 5, progress: {}, checkins: {}, mistakes: [], dailies: {}, daily: null });
 let storageAvailable = true;
 let data = load();
 
@@ -347,19 +535,28 @@ function addMistake(id) {
   if (!data.mistakes.includes(id)) data.mistakes.push(id);
 }
 
-// 生成/读取今日任务：到期复习 + 新词
+// 生成/读取当前学期的今日任务：到期复习 + 新词
 function ensureDaily() {
   const t = today();
-  if (data.daily && data.daily.date === t) return;
-  const review = WORDS.filter(x => { const p = prog(x.id); return p.stage > 0 && p.stage < MAX_STAGE && p.next && p.next <= t; }).map(x => x.id);
-  const fresh = WORDS.filter(x => prog(x.id).stage === 0).slice(0, data.goal).map(x => x.id);
-  data.daily = { date: t, queue: [...review.map(id => ({ id, type: 'review' })), ...fresh.map(id => ({ id, type: 'new' }))], pos: 0 };
+  const term = currentTerm();
+  const words = activeWords();
+  if (!data.dailies) data.dailies = {};
+  // 兼容旧版：原上册今日任务迁移到上册任务槽，已有进度 ID 保持不变
+  if (!Object.keys(data.dailies).length && data.daily && !data.daily.term) data.dailies['1A'] = data.daily;
+  if (data.dailies[term] && data.dailies[term].date === t) {
+    data.daily = data.dailies[term];
+    return;
+  }
+  const review = words.filter(x => { const p = prog(x.id); return p.stage > 0 && p.stage < MAX_STAGE && p.next && p.next <= t; }).map(x => x.id);
+  const fresh = words.filter(x => prog(x.id).stage === 0).slice(0, data.goal).map(x => x.id);
+  data.dailies[term] = { term: term, date: t, queue: [...review.map(id => ({ id, type: 'review' })), ...fresh.map(id => ({ id, type: 'new' }))], pos: 0 };
+  data.daily = data.dailies[term];
   save();
 }
 
 function addMoreNew() {
   const inQueue = new Set(data.daily.queue.map(q => q.id));
-  const more = WORDS.filter(x => prog(x.id).stage === 0 && !inQueue.has(x.id)).slice(0, data.goal);
+  const more = activeWords().filter(x => prog(x.id).stage === 0 && !inQueue.has(x.id)).slice(0, data.goal);
   more.forEach(x => data.daily.queue.push({ id: x.id, type: 'new' }));
   save();
   renderToday();
@@ -453,8 +650,9 @@ function renderToday() {
 
   // 全部完成 / 无任务
   if (d.pos >= total) {
-    const allMastered = WORDS.every(x => prog(x.id).stage >= MAX_STAGE);
-    const hasNew = WORDS.some(x => prog(x.id).stage === 0);
+    const words = activeWords();
+    const allMastered = words.every(x => prog(x.id).stage >= MAX_STAGE);
+    const hasNew = words.some(x => prog(x.id).stage === 0);
     body.append(el('div', { class: 'card' }, [
       el('div', { class: 'celebrate', text: total ? '🎉' : '😊' }),
       el('div', { class: 'cn', text: total ? '今日打卡完成！' : (allMastered ? '全部单词都掌握啦！' : '今天没有需要复习的单词') }),
@@ -545,13 +743,13 @@ function renderReviewCard(body, x) {
 function renderList() {
   const root = document.getElementById('word-list');
   root.innerHTML = '';
-  UNITS.forEach(u => {
-    const list = WORDS.filter(x => x.unit === u);
+  activeUnits().forEach(u => {
+    const list = activeWords().filter(x => x.unit === u);
     const done = list.filter(x => prog(x.id).stage >= MAX_STAGE).length;
     root.append(el('div', { class: 'unit-title' }, [el('span', { text: 'Unit ' + u }), el('span', { text: `掌握 ${done}/${list.length}` })]));
     root.append(el('div', { class: 'wl' }, list.map(x =>
       el('div', { class: 'wl-row' }, [
-        el('span', { class: 'wl-no', text: x.id }),
+        el('span', { class: 'wl-no', text: x.no }),
         el('div', { class: 'wl-main', role: 'button', tabindex: '0', 'aria-label': '朗读 ' + x.w,
                     onclick: () => speak(x.w), onkeydown: e => { if (e.key === 'Enter') speak(x.w); } }, [
           el('div', { class: 'w', text: x.w }),
@@ -564,24 +762,197 @@ function renderList() {
   });
 }
 
+// ================= 互动练习 =================
+const practice = { questions: [], idx: 0, score: 0, answered: false, term: null };
+const PRACTICE_TYPES = ['meaning', 'listening', 'sentence'];
+
+function currentTermMistakes() {
+  return data.mistakes.filter(id => BY_ID[id] && BY_ID[id].term === currentTerm());
+}
+
+function initPracticeSelect() {
+  const sel = document.getElementById('practice-unit');
+  const previous = sel.value;
+  const mistakes = currentTermMistakes();
+  sel.innerHTML = '';
+  sel.append(el('option', { value: 'all', text: '本册全部单元' }));
+  sel.append(el('option', { value: 'mistakes', text: `本册错题（${mistakes.length}）` }));
+  activeUnits().forEach(u => sel.append(el('option', { value: u, text: 'Unit ' + u })));
+  if (Array.prototype.some.call(sel.options, option => option.value === previous)) sel.value = previous;
+}
+
+function resetPracticeWelcome() {
+  practice.questions = [];
+  practice.idx = 0;
+  practice.score = 0;
+  practice.answered = false;
+  practice.term = currentTerm();
+  const area = document.getElementById('practice-area');
+  area.innerHTML = '';
+  area.append(el('div', { class: 'card' }, [
+    el('div', { class: 'celebrate', style: 'font-size:44px', text: '✏️' }),
+    el('div', { class: 'cn', text: '选择范围和题型，开始练习吧！' }),
+    el('div', { class: 'hint', text: '每轮最多 10 题，答错会自动加入错题本。' })
+  ]));
+}
+
+function practicePool() {
+  const scope = document.getElementById('practice-unit').value;
+  const words = activeWords();
+  if (scope === 'mistakes') return currentTermMistakes().map(id => BY_ID[id]);
+  if (scope === 'all') return words;
+  return words.filter(x => x.unit === Number(scope));
+}
+
+function startPractice() {
+  const pool = practicePool();
+  const area = document.getElementById('practice-area');
+  if (!pool.length) {
+    area.innerHTML = '';
+    area.append(el('div', { class: 'card' }, [
+      el('div', { class: 'celebrate', style: 'font-size:44px', text: '🎉' }),
+      el('div', { class: 'cn', text: '这个范围暂时没有题目' }),
+      el('div', { class: 'hint', text: '错题本为空时，可以选择全部单元或某个 Unit。' })
+    ]));
+    return;
+  }
+  const selectedType = document.getElementById('practice-type').value;
+  const targets = shuffle(pool.slice()).slice(0, Math.min(10, pool.length));
+  practice.questions = targets.map(x => ({
+    id: x.id,
+    type: selectedType === 'mixed' ? PRACTICE_TYPES[Math.floor(Math.random() * PRACTICE_TYPES.length)] : selectedType
+  }));
+  practice.idx = 0;
+  practice.score = 0;
+  practice.answered = false;
+  practice.term = currentTerm();
+  renderPractice();
+}
+
+function practiceOptions(target) {
+  const others = shuffle(activeWords().filter(x => x.id !== target.id).slice()).slice(0, 3);
+  return shuffle([target, ...others]);
+}
+
+function blankExample(x) {
+  const start = x.example.toLowerCase().indexOf(x.w.toLowerCase());
+  if (start < 0) return '____  (' + x.exampleCn + ')';
+  return x.example.slice(0, start) + '____' + x.example.slice(start + x.w.length);
+}
+
+function renderPractice() {
+  const area = document.getElementById('practice-area');
+  area.innerHTML = '';
+  if (!practice.questions.length || practice.term !== currentTerm()) {
+    resetPracticeWelcome();
+    return;
+  }
+  if (practice.idx >= practice.questions.length) {
+    const total = practice.questions.length;
+    const percent = Math.round(practice.score / total * 100);
+    const face = percent === 100 ? '🏆' : percent >= 80 ? '🌟' : percent >= 60 ? '👏' : '💪';
+    area.append(el('div', { class: 'card' }, [
+      el('div', { class: 'celebrate', text: face }),
+      el('div', { class: 'cn', text: '本轮练习完成！' }),
+      el('div', { class: 'score-big', text: `${practice.score}/${total}` }),
+      el('div', { class: 'hint', text: `正确率 ${percent}% · ${percent >= 80 ? '太棒了！' : '继续加油！'}` })
+    ]));
+    area.append(el('button', { class: 'btn btn-primary', style: 'width:100%', text: '再练一轮', onclick: startPractice }));
+    initPracticeSelect();
+    return;
+  }
+
+  const q = practice.questions[practice.idx];
+  const x = BY_ID[q.id];
+  const typeNames = { meaning: '看中文选英文', listening: '听音选单词', sentence: '例句选词填空' };
+  const prompt = el('div', { class: 'quiz-prompt' + (q.type === 'sentence' ? ' sentence' : '') });
+  const helper = el('div', { class: 'hint' });
+
+  if (q.type === 'meaning') {
+    prompt.textContent = x.cn;
+    helper.textContent = '请选择对应的英文单词或词组';
+  } else if (q.type === 'listening') {
+    prompt.append(el('button', { class: 'btn-icon', style: 'font-size:54px', 'aria-label': '播放题目发音', text: '🔊', onclick: () => speak(x.w) }));
+    helper.textContent = '听发音，选择正确的单词或词组';
+  } else {
+    prompt.textContent = blankExample(x);
+    helper.textContent = x.exampleCn;
+  }
+
+  const options = el('div', { class: 'quiz-options' });
+  practiceOptions(x).forEach(option => {
+    options.append(el('button', {
+      class: 'quiz-option',
+      'data-option-id': option.id,
+      text: option.w,
+      onclick: () => answerPractice(option.id)
+    }));
+  });
+
+  area.append(el('div', { class: 'quiz-meta' }, [
+    el('span', { text: `${typeNames[q.type]} · Unit ${x.unit}` }),
+    el('span', { text: `${practice.idx + 1}/${practice.questions.length}　得分 ${practice.score}` })
+  ]));
+  area.append(el('div', { class: 'progress' }, [
+    el('div', { style: `width:${practice.idx / practice.questions.length * 100}%` })
+  ]));
+  area.append(el('div', { class: 'card' }, [prompt, helper, options, el('div', { class: 'feedback', id: 'practice-feedback', 'aria-live': 'polite' })]));
+  area.append(el('div', { id: 'practice-actions' }));
+  if (q.type === 'listening') speak(x.w);
+}
+
+function answerPractice(chosenId) {
+  if (practice.answered) return;
+  practice.answered = true;
+  const q = practice.questions[practice.idx];
+  const x = BY_ID[q.id];
+  const right = chosenId === x.id;
+  document.querySelectorAll('#practice-area .quiz-option').forEach(button => {
+    button.disabled = true;
+    const id = Number(button.getAttribute('data-option-id'));
+    if (id === x.id) button.classList.add('correct-answer');
+    else if (id === chosenId) button.classList.add('wrong-answer');
+  });
+  const fb = document.getElementById('practice-feedback');
+  if (right) {
+    practice.score++;
+    fb.className = 'feedback ok';
+    fb.textContent = '✅ 回答正确！';
+  } else {
+    addMistake(x.id);
+    save();
+    fb.className = 'feedback bad';
+    fb.textContent = `❌ 正确答案：${x.w}`;
+  }
+  speak(x.w);
+  const actions = document.getElementById('practice-actions');
+  actions.append(el('button', {
+    class: 'btn btn-primary', style: 'width:100%',
+    text: practice.idx + 1 >= practice.questions.length ? '查看成绩' : '下一题 ➡️',
+    onclick: () => { practice.idx++; practice.answered = false; renderPractice(); }
+  }));
+}
+
 // ================= 默写练习 =================
 const dict = { list: [], idx: 0, answered: false };
 
 function initDictSelect() {
   const sel = document.getElementById('dict-unit');
+  const termMistakes = data.mistakes.filter(id => BY_ID[id] && BY_ID[id].term === currentTerm());
   sel.innerHTML = '';
-  sel.append(el('option', { value: 'all', text: '全部单元（随机）' }));
-  sel.append(el('option', { value: 'mistakes', text: `错题本（${data.mistakes.length}）` }));
-  UNITS.forEach(u => sel.append(el('option', { value: u, text: 'Unit ' + u })));
+  sel.append(el('option', { value: 'all', text: '本册全部单元（随机）' }));
+  sel.append(el('option', { value: 'mistakes', text: `本册错题（${termMistakes.length}）` }));
+  activeUnits().forEach(u => sel.append(el('option', { value: u, text: 'Unit ' + u })));
 }
 
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 function loadDictList() {
   const v = document.getElementById('dict-unit').value;
-  if (v === 'all') dict.list = shuffle(WORDS.map(x => x.id));
-  else if (v === 'mistakes') dict.list = [...data.mistakes];
-  else dict.list = WORDS.filter(x => x.unit === Number(v)).map(x => x.id);
+  const words = activeWords();
+  if (v === 'all') dict.list = shuffle(words.map(x => x.id));
+  else if (v === 'mistakes') dict.list = data.mistakes.filter(id => BY_ID[id] && BY_ID[id].term === currentTerm());
+  else dict.list = words.filter(x => x.unit === Number(v)).map(x => x.id);
   dict.idx = 0;
   renderDict();
 }
@@ -639,9 +1010,10 @@ function streak() {
 let calMonth = (() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() }; })();
 
 function renderRecord() {
+  const termMistakes = data.mistakes.filter(id => BY_ID[id] && BY_ID[id].term === currentTerm());
   document.getElementById('st-streak').textContent = streak();
   document.getElementById('st-days').textContent = Object.keys(data.checkins).length;
-  document.getElementById('st-learned').textContent = WORDS.filter(x => prog(x.id).stage > 0).length;
+  document.getElementById('st-learned').textContent = activeWords().filter(x => prog(x.id).stage > 0).length;
   document.getElementById('set-goal').value = data.goal;
 
   // 日历
@@ -657,11 +1029,11 @@ function renderRecord() {
   }
 
   // 错题本
-  document.getElementById('mistake-count').textContent = data.mistakes.length;
+  document.getElementById('mistake-count').textContent = termMistakes.length;
   const ml = document.getElementById('mistake-list');
   ml.innerHTML = '';
-  if (!data.mistakes.length) { ml.append(el('div', { class: 'empty', text: '太棒了！目前没有错题 🎉' })); return; }
-  data.mistakes.forEach(id => {
+  if (!termMistakes.length) { ml.append(el('div', { class: 'empty', text: '太棒了！本册目前没有错题 🎉' })); return; }
+  termMistakes.forEach(id => {
     const x = BY_ID[id];
     ml.append(el('div', { class: 'mistake-item' }, [
       el('div', {}, [el('b', { style: 'color:var(--primary)', text: x.w }), el('span', { class: 'hint', text: `  ${x.ipa}  ${x.cn}` })]),
@@ -675,21 +1047,43 @@ function renderRecord() {
 }
 
 function renderHeader() {
+  const words = activeWords();
+  const isLower = currentTerm() === '1B';
+  document.title = `一年级${isLower ? '下册' : '上册'} · 单词打卡`;
+  document.getElementById('app-title').textContent = `📒 一年级${isLower ? '下册' : '上册'} · 单词打卡`;
+  document.getElementById('term-select').value = currentTerm();
   document.getElementById('hd-streak').textContent = streak();
-  document.getElementById('hd-mastered').textContent = WORDS.filter(x => prog(x.id).stage >= MAX_STAGE).length;
-  document.getElementById('hd-total').textContent = WORDS.length;
+  document.getElementById('hd-mastered').textContent = words.filter(x => prog(x.id).stage >= MAX_STAGE).length;
+  document.getElementById('hd-total').textContent = words.length;
 }
 
 // ================= 事件绑定 =================
+document.getElementById('term-select').addEventListener('change', e => {
+  data.term = e.target.value === '1B' ? '1B' : '1A';
+  data.daily = null;
+  save();
+  renderHeader();
+  renderToday();
+  renderList();
+  initPracticeSelect();
+  resetPracticeWelcome();
+  initDictSelect();
+  loadDictList();
+  renderRecord();
+});
+
 document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + btn.dataset.tab));
   const tab = btn.dataset.tab;
   if (tab === 'today') renderToday();
   if (tab === 'list') renderList();
+  if (tab === 'practice' && practice.term !== currentTerm()) { initPracticeSelect(); resetPracticeWelcome(); }
   if (tab === 'dictation') { const v = document.getElementById('dict-unit').value; initDictSelect(); document.getElementById('dict-unit').value = v || 'all'; loadDictList(); }
   if (tab === 'record') renderRecord();
 }));
+
+document.getElementById('practice-start').addEventListener('click', startPractice);
 
 document.getElementById('dict-unit').addEventListener('change', loadDictList);
 document.getElementById('dict-check').addEventListener('click', checkDict);
@@ -705,14 +1099,16 @@ document.getElementById('set-goal').addEventListener('change', e => {
   e.target.value = v; data.goal = v; save();
 });
 document.getElementById('btn-reset').addEventListener('click', () => {
-  if (!confirm('确定清空所有打卡记录、进度和错题吗？此操作不可恢复。')) return;
+  if (!confirm('确定清空上下册全部打卡记录、进度和错题吗？此操作不可恢复。')) return;
   data = defaultData(); save();
-  renderHeader(); renderRecord();
+  renderHeader(); renderToday(); renderList(); initPracticeSelect(); resetPracticeWelcome(); initDictSelect(); loadDictList(); renderRecord();
 });
 
 // ================= 启动 =================
 renderHeader();
 renderToday();
+initPracticeSelect();
+resetPracticeWelcome();
 initDictSelect();
 </script>
 </body>
