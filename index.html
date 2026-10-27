@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>一年级上册 · 单词打卡</title>
+<title>单词打卡</title>
 <style>
   :root { --primary:#0b4ea2; --light:#e8f0fb; --bg:#f0f4ff; --text:#1e3a5f; --gray:#64748b; --green:#16a34a; --red:#e11d48; --orange:#f59e0b; }
   * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
@@ -109,7 +109,7 @@
 <body>
 
 <header>
-  <h1 id="app-title">📒 一年级上册 · 单词打卡</h1>
+  <h1 id="app-title">📒 单词打卡</h1>
   <div class="motto">An apple a day keeps the doctor away. 每天一个苹果，医生远离我。</div>
   <div class="term-picker">
     <label for="term-select">选择教材</label>
@@ -1048,9 +1048,8 @@ function renderRecord() {
 
 function renderHeader() {
   const words = activeWords();
-  const isLower = currentTerm() === '1B';
-  document.title = `一年级${isLower ? '下册' : '上册'} · 单词打卡`;
-  document.getElementById('app-title').textContent = `📒 一年级${isLower ? '下册' : '上册'} · 单词打卡`;
+  document.title = '单词打卡';
+  document.getElementById('app-title').textContent = '📒 单词打卡';
   document.getElementById('term-select').value = currentTerm();
   document.getElementById('hd-streak').textContent = streak();
   document.getElementById('hd-mastered').textContent = words.filter(x => prog(x.id).stage >= MAX_STAGE).length;
