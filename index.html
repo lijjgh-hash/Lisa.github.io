@@ -78,6 +78,14 @@
   .quiz-option.wrong-answer { background:#ffe4e6; border-color:var(--red); color:#9f1239; }
   .score-big { font-size:42px; font-weight:800; color:var(--primary); margin:8px 0; }
 
+  /* 跟读录音 */
+  .voice-actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:12px; }
+  .voice-status { min-height:24px; margin:8px 0; color:var(--gray); font-size:14px; font-weight:600; }
+  .voice-status.recording { color:var(--red); animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.45; } }
+  .voice-player { width:100%; margin-top:10px; }
+  .voice-note { background:#fff7ed; color:#9a3412; padding:9px 12px; border-radius:9px; margin-bottom:10px; font-size:12px; line-height:1.45; }
+
   /* 单词表 */
   .unit-title { background:var(--primary); color:#fff; border-radius:10px 10px 0 0; padding:8px 12px; font-weight:700; margin-top:12px;
                 display:flex; justify-content:space-between; font-size:15px; }
@@ -128,6 +136,7 @@
   <button class="tab active" data-tab="today">今日打卡</button>
   <button class="tab" data-tab="list">单词表</button>
   <button class="tab" data-tab="practice">练习</button>
+  <button class="tab" data-tab="voice">录音</button>
   <button class="tab" data-tab="dictation">默写</button>
   <button class="tab" data-tab="record">打卡记录</button>
 </nav>
@@ -169,6 +178,40 @@
       <div class="hint">每轮最多 10 题，答错会自动加入错题本。</div>
     </div>
   </div>
+</section>
+
+<!-- 跟读录音 -->
+<section id="page-voice" class="page">
+  <select id="voice-unit" aria-label="选择录音范围"></select>
+  <div id="voice-security-note" class="voice-note" style="display:none"></div>
+  <div class="card">
+    <span class="badge unit" id="voice-pos"></span>
+    <div class="word-en" id="voice-word">morning</div>
+    <div class="ipa" id="voice-ipa"></div>
+    <div class="cn" id="voice-cn"></div>
+    <div class="example">
+      <div class="example-en" id="voice-example"></div>
+      <div class="example-cn" id="voice-example-cn"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="voice-word-speak">🔊 单词</button>
+      <button class="btn btn-gray" id="voice-example-speak">🔊 例句</button>
+    </div>
+    <div id="voice-status" class="voice-status">点击“开始录音”进行跟读</div>
+    <audio id="voice-audio" class="voice-player" controls style="display:none"></audio>
+    <div class="voice-actions">
+      <button class="btn btn-red" id="voice-start">🎙️ 开始录音</button>
+      <button class="btn btn-gray" id="voice-stop" disabled>⏹ 停止</button>
+      <button class="btn btn-green" id="voice-play" disabled>▶ 回放我的录音</button>
+      <button class="btn btn-gray" id="voice-delete" disabled>🗑️ 删除录音</button>
+    </div>
+    <input id="voice-file" type="file" accept="audio/*" capture="user" style="display:none">
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-gray" id="voice-prev">⬅️ 上一个</button>
+    <button class="btn btn-primary" id="voice-next">下一个 ➡️</button>
+  </div>
+  <div class="hint" style="text-align:center;margin-top:10px">录音按单词保存在本设备浏览器中，不会上传。</div>
 </section>
 
 <!-- 默写 -->
@@ -933,6 +976,217 @@ function answerPractice(chosenId) {
   }));
 }
 
+// ================= 跟读录音 =================
+const VOICE_DB_NAME = 'word_checkin_audio_v1';
+const VOICE_STORE = 'recordings';
+const voiceState = { list: [], idx: 0, term: null, stream: null, recorder: null, chunks: [], blob: null, url: null, loadToken: 0 };
+let voiceDbPromise = null;
+
+function openVoiceDb() {
+  if (voiceDbPromise) return voiceDbPromise;
+  voiceDbPromise = new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('此浏览器不支持录音存储')); return; }
+    const request = window.indexedDB.open(VOICE_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(VOICE_STORE)) db.createObjectStore(VOICE_STORE, { keyPath: 'id' });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('无法打开录音存储'));
+  });
+  return voiceDbPromise;
+}
+
+async function readVoiceBlob(id) {
+  const db = await openVoiceDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(VOICE_STORE, 'readonly').objectStore(VOICE_STORE).get(id);
+    request.onsuccess = () => resolve(request.result ? request.result.blob : null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveVoiceBlob(id, blob) {
+  const db = await openVoiceDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(VOICE_STORE, 'readwrite').objectStore(VOICE_STORE).put({ id: id, blob: blob, updated: Date.now() });
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deleteVoiceBlob(id) {
+  const db = await openVoiceDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(VOICE_STORE, 'readwrite').objectStore(VOICE_STORE).delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function initVoiceSelect() {
+  const sel = document.getElementById('voice-unit');
+  const previous = sel.value;
+  sel.innerHTML = '';
+  sel.append(el('option', { value: 'all', text: '本册全部单词' }));
+  activeUnits().forEach(u => sel.append(el('option', { value: u, text: 'Unit ' + u })));
+  if (Array.prototype.some.call(sel.options, option => option.value === previous)) sel.value = previous;
+}
+
+function loadVoiceList() {
+  const scope = document.getElementById('voice-unit').value || 'all';
+  const words = activeWords();
+  voiceState.list = scope === 'all' ? words.map(x => x.id) : words.filter(x => x.unit === Number(scope)).map(x => x.id);
+  voiceState.idx = 0;
+  voiceState.term = currentTerm();
+  renderVoiceWord();
+}
+
+function releaseVoiceUrl() {
+  if (voiceState.url) {
+    URL.revokeObjectURL(voiceState.url);
+    voiceState.url = null;
+  }
+}
+
+function setVoiceBlob(blob) {
+  releaseVoiceUrl();
+  voiceState.blob = blob || null;
+  const audio = document.getElementById('voice-audio');
+  const hasAudio = !!blob;
+  if (hasAudio) {
+    voiceState.url = URL.createObjectURL(blob);
+    audio.src = voiceState.url;
+  } else {
+    audio.removeAttribute('src');
+    audio.load();
+  }
+  audio.style.display = hasAudio ? 'block' : 'none';
+  document.getElementById('voice-play').disabled = !hasAudio;
+  document.getElementById('voice-delete').disabled = !hasAudio;
+}
+
+async function renderVoiceWord() {
+  if (!voiceState.list.length) return;
+  const id = voiceState.list[voiceState.idx];
+  const x = BY_ID[id];
+  const token = ++voiceState.loadToken;
+  document.getElementById('voice-word').textContent = x.w;
+  document.getElementById('voice-ipa').textContent = x.ipa;
+  document.getElementById('voice-cn').textContent = x.cn;
+  document.getElementById('voice-example').textContent = x.example;
+  document.getElementById('voice-example-cn').textContent = x.exampleCn;
+  document.getElementById('voice-pos').textContent = `Unit ${x.unit} · ${voiceState.idx + 1}/${voiceState.list.length}`;
+  document.getElementById('voice-status').className = 'voice-status';
+  document.getElementById('voice-status').textContent = '正在读取已保存的录音…';
+  document.getElementById('voice-start').disabled = false;
+  document.getElementById('voice-stop').disabled = true;
+  setVoiceBlob(null);
+
+  const directRecording = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  const note = document.getElementById('voice-security-note');
+  note.style.display = directRecording ? 'none' : 'block';
+  note.textContent = '当前地址不是 HTTPS，iPad Safari 不允许网页直接调用麦克风。“开始录音”将尝试打开系统录音或音频文件选择器。';
+
+  try {
+    const blob = await readVoiceBlob(id);
+    if (token !== voiceState.loadToken) return;
+    setVoiceBlob(blob);
+    document.getElementById('voice-status').textContent = blob ? '已找到这个单词的录音，可以回放或重新录制。' : '点击“开始录音”进行跟读';
+  } catch (error) {
+    if (token !== voiceState.loadToken) return;
+    document.getElementById('voice-status').textContent = '点击“开始录音”进行跟读（当前录音可能无法永久保存）';
+  }
+}
+
+async function startVoiceRecording() {
+  if (!voiceState.list.length) return;
+  const canRecordDirectly = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  if (!canRecordDirectly) {
+    document.getElementById('voice-file').click();
+    return;
+  }
+  const status = document.getElementById('voice-status');
+  try {
+    voiceState.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    let options;
+    if (window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported('audio/mp4')) options = { mimeType: 'audio/mp4' };
+    else if (window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported('audio/webm')) options = { mimeType: 'audio/webm' };
+    voiceState.recorder = options ? new MediaRecorder(voiceState.stream, options) : new MediaRecorder(voiceState.stream);
+    voiceState.chunks = [];
+    const recordingId = voiceState.list[voiceState.idx];
+    voiceState.recorder.ondataavailable = event => { if (event.data && event.data.size) voiceState.chunks.push(event.data); };
+    voiceState.recorder.onstop = async () => {
+      const type = voiceState.recorder.mimeType || (voiceState.chunks[0] && voiceState.chunks[0].type) || 'audio/mp4';
+      const blob = new Blob(voiceState.chunks, { type: type });
+      if (voiceState.stream) voiceState.stream.getTracks().forEach(track => track.stop());
+      voiceState.stream = null;
+      voiceState.recorder = null;
+      document.getElementById('voice-start').disabled = false;
+      document.getElementById('voice-stop').disabled = true;
+      document.getElementById('voice-prev').disabled = false;
+      document.getElementById('voice-next').disabled = false;
+      document.getElementById('term-select').disabled = false;
+      if (!blob.size) { status.className = 'voice-status'; status.textContent = '没有录到声音，请重试。'; return; }
+      setVoiceBlob(blob);
+      try {
+        await saveVoiceBlob(recordingId, blob);
+        status.textContent = '✅ 录音已保存，可以回放。';
+        status.className = 'voice-status ok';
+      } catch (error) {
+        status.textContent = '录音可以回放，但当前浏览器无法永久保存。';
+        status.className = 'voice-status bad';
+      }
+    };
+    voiceState.recorder.start();
+    status.className = 'voice-status recording';
+    status.textContent = '🔴 正在录音…读完后请点击“停止”';
+    document.getElementById('voice-start').disabled = true;
+    document.getElementById('voice-stop').disabled = false;
+    document.getElementById('voice-prev').disabled = true;
+    document.getElementById('voice-next').disabled = true;
+    document.getElementById('term-select').disabled = true;
+  } catch (error) {
+    document.getElementById('term-select').disabled = false;
+    status.className = 'voice-status bad';
+    status.textContent = error && error.name === 'NotAllowedError' ? '麦克风权限被拒绝，请在 Safari 网站设置中允许麦克风。' : '无法启动录音，请确认麦克风可用并使用 HTTPS 打开。';
+  }
+}
+
+function stopVoiceRecording() {
+  if (voiceState.recorder && voiceState.recorder.state === 'recording') voiceState.recorder.stop();
+}
+
+function moveVoice(step) {
+  if (!voiceState.list.length || voiceState.recorder) return;
+  voiceState.idx = (voiceState.idx + step + voiceState.list.length) % voiceState.list.length;
+  renderVoiceWord();
+}
+
+async function removeCurrentVoice() {
+  if (!voiceState.list.length) return;
+  const id = voiceState.list[voiceState.idx];
+  setVoiceBlob(null);
+  try {
+    await deleteVoiceBlob(id);
+    document.getElementById('voice-status').textContent = '录音已删除，可以重新录制。';
+  } catch (error) {
+    document.getElementById('voice-status').textContent = '录音已从当前页面移除。';
+  }
+}
+
+async function acceptVoiceFile(file) {
+  if (!file || !voiceState.list.length) return;
+  const id = voiceState.list[voiceState.idx];
+  setVoiceBlob(file);
+  try {
+    await saveVoiceBlob(id, file);
+    document.getElementById('voice-status').textContent = '✅ 录音已保存，可以回放。';
+  } catch (error) {
+    document.getElementById('voice-status').textContent = '录音可以回放，但当前浏览器无法永久保存。';
+  }
+}
+
 // ================= 默写练习 =================
 const dict = { list: [], idx: 0, answered: false };
 
@@ -1066,6 +1320,9 @@ document.getElementById('term-select').addEventListener('change', e => {
   renderList();
   initPracticeSelect();
   resetPracticeWelcome();
+  initVoiceSelect();
+  voiceState.list = [];
+  voiceState.term = currentTerm();
   initDictSelect();
   loadDictList();
   renderRecord();
@@ -1078,11 +1335,31 @@ document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', (
   if (tab === 'today') renderToday();
   if (tab === 'list') renderList();
   if (tab === 'practice' && practice.term !== currentTerm()) { initPracticeSelect(); resetPracticeWelcome(); }
+  if (tab === 'voice') { initVoiceSelect(); loadVoiceList(); }
   if (tab === 'dictation') { const v = document.getElementById('dict-unit').value; initDictSelect(); document.getElementById('dict-unit').value = v || 'all'; loadDictList(); }
   if (tab === 'record') renderRecord();
 }));
 
 document.getElementById('practice-start').addEventListener('click', startPractice);
+
+document.getElementById('voice-unit').addEventListener('change', loadVoiceList);
+document.getElementById('voice-word-speak').addEventListener('click', () => voiceState.list.length && speak(BY_ID[voiceState.list[voiceState.idx]].w));
+document.getElementById('voice-example-speak').addEventListener('click', () => voiceState.list.length && speak(BY_ID[voiceState.list[voiceState.idx]].example));
+document.getElementById('voice-start').addEventListener('click', startVoiceRecording);
+document.getElementById('voice-stop').addEventListener('click', stopVoiceRecording);
+document.getElementById('voice-play').addEventListener('click', () => {
+  const audio = document.getElementById('voice-audio');
+  audio.currentTime = 0;
+  const result = audio.play();
+  if (result && result.catch) result.catch(() => { document.getElementById('voice-status').textContent = '无法播放录音，请重新录制。'; });
+});
+document.getElementById('voice-delete').addEventListener('click', removeCurrentVoice);
+document.getElementById('voice-prev').addEventListener('click', () => moveVoice(-1));
+document.getElementById('voice-next').addEventListener('click', () => moveVoice(1));
+document.getElementById('voice-file').addEventListener('change', event => {
+  acceptVoiceFile(event.target.files && event.target.files[0]);
+  event.target.value = '';
+});
 
 document.getElementById('dict-unit').addEventListener('change', loadDictList);
 document.getElementById('dict-check').addEventListener('click', checkDict);
@@ -1100,7 +1377,7 @@ document.getElementById('set-goal').addEventListener('change', e => {
 document.getElementById('btn-reset').addEventListener('click', () => {
   if (!confirm('确定清空上下册全部打卡记录、进度和错题吗？此操作不可恢复。')) return;
   data = defaultData(); save();
-  renderHeader(); renderToday(); renderList(); initPracticeSelect(); resetPracticeWelcome(); initDictSelect(); loadDictList(); renderRecord();
+  renderHeader(); renderToday(); renderList(); initPracticeSelect(); resetPracticeWelcome(); initVoiceSelect(); voiceState.list = []; initDictSelect(); loadDictList(); renderRecord();
 });
 
 // ================= 启动 =================
@@ -1108,6 +1385,7 @@ renderHeader();
 renderToday();
 initPracticeSelect();
 resetPracticeWelcome();
+initVoiceSelect();
 initDictSelect();
 </script>
 </body>
