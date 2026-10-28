@@ -239,7 +239,7 @@
     <div class="card">
       <div class="celebrate" style="font-size:44px">✏️</div>
       <div class="cn">选择范围和题型，开始练习吧！</div>
-      <div class="hint">每轮最多 10 题，答错会自动加入错题本。</div>
+      <div class="hint">默认练习今日打卡内容；每轮最多 10 题，答错会自动加入错题本。</div>
     </div>
   </div>
 </section>
@@ -1169,13 +1169,18 @@ function currentTermMistakes() {
 function initPracticeSelect() {
   const sel = document.getElementById('practice-unit');
   const previous = sel.value;
+  const termChanged = practice.term !== currentTerm();
   const mistakes = currentTermMistakes();
   sel.innerHTML = '';
+  sel.append(el('option', { value: 'today', text: '今日打卡内容' }));
   sel.append(el('option', { value: 'all', text: '本册全部单元' }));
   if (currentTerm() === 'QB') sel.append(el('option', { value: 'priority', text: '★ 重点词组' }));
   sel.append(el('option', { value: 'mistakes', text: `本册错题（${mistakes.length}）` }));
   activeUnits().forEach(u => sel.append(el('option', { value: u, text: unitText(u) + (currentTerm() === 'QB' ? ' · ' + themeTitle(u) : '') })));
-  if (Array.prototype.some.call(sel.options, option => option.value === previous)) sel.value = previous;
+  const desired = !termChanged && Array.prototype.some.call(sel.options, option => option.value === previous) ? previous : 'today';
+  Array.prototype.forEach.call(sel.options, option => option.removeAttribute('selected'));
+  const desiredOption = Array.prototype.find.call(sel.options, option => option.value === desired);
+  if (desiredOption) desiredOption.setAttribute('selected', '');
   const sentenceOption = document.querySelector('#practice-type option[value="sentence"]');
   sentenceOption.disabled = currentTerm() === 'QB';
   if (sentenceOption.disabled && document.getElementById('practice-type').value === 'sentence') document.getElementById('practice-type').value = 'mixed';
@@ -1193,13 +1198,18 @@ function resetPracticeWelcome() {
   area.append(el('div', { class: 'card' }, [
     el('div', { class: 'celebrate', style: 'font-size:44px', text: '✏️' }),
     el('div', { class: 'cn', text: '选择范围和题型，开始练习吧！' }),
-    el('div', { class: 'hint', text: '每轮最多 10 题，答错会自动加入错题本。' })
+    el('div', { class: 'hint', text: '默认练习今日打卡内容；每轮最多 10 题，答错会自动加入错题本。' })
   ]));
 }
 
 function practicePool() {
   const scope = document.getElementById('practice-unit').value;
   const words = activeWords();
+  if (scope === 'today') {
+    ensureDaily();
+    const ids = [...new Set((data.daily && data.daily.queue || []).map(item => item.id))];
+    return ids.map(id => BY_ID[id]).filter(x => x && x.term === currentTerm());
+  }
   if (scope === 'mistakes') return currentTermMistakes().map(id => BY_ID[id]);
   if (scope === 'priority') return words.filter(x => x.starred);
   if (scope === 'all') return words;
@@ -1207,6 +1217,7 @@ function practicePool() {
 }
 
 function startPractice() {
+  const scope = document.getElementById('practice-unit').value;
   const pool = practicePool();
   const area = document.getElementById('practice-area');
   if (!pool.length) {
@@ -1214,7 +1225,7 @@ function startPractice() {
     area.append(el('div', { class: 'card' }, [
       el('div', { class: 'celebrate', style: 'font-size:44px', text: '🎉' }),
       el('div', { class: 'cn', text: '这个范围暂时没有题目' }),
-      el('div', { class: 'hint', text: '错题本为空时，可以选择全部单元或某个 Unit。' })
+      el('div', { class: 'hint', text: scope === 'today' ? '今天还没有打卡任务，请先到“今日打卡”生成任务。' : '错题本为空时，可以选择今日打卡、全部单元或某个 Unit。' })
     ]));
     return;
   }
