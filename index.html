@@ -24,7 +24,7 @@
           backdrop-filter:blur(8px); -webkit-overflow-scrolling:touch; scrollbar-width:none; }
   .tabs::-webkit-scrollbar { display:none; }
   .tab { flex:0 0 auto; min-height:44px; padding:8px 14px; border:none; border-radius:22px; background:#dbeafe; color:var(--primary);
-         font-size:14px; font-weight:600; cursor:pointer; transition:all .2s; }
+         font-size:16px; font-weight:700; cursor:pointer; transition:all .2s; }
   .tab.active { background:var(--primary); color:#fff; }
 
   .page { display:none; width:100%; max-width:760px; animation:fadeIn .3s; }
@@ -674,6 +674,7 @@ function sanitizeDaily(rawDaily, fallbackTerm) {
     term: term,
     date: validDate(rawDaily.date) ? rawDaily.date : '',
     scope: validScope(term, rawDaily.scope) ? rawDaily.scope : 'all',
+    strategy: typeof rawDaily.strategy === 'string' ? rawDaily.strategy : '',
     queue: queue,
     pos: Math.max(0, Math.min(Number(rawDaily.pos) || 0, queue.length))
   };
@@ -852,7 +853,8 @@ function ensureDaily() {
   if (!data.dailies) data.dailies = {};
   // 兼容旧版：原上册今日任务迁移到上册任务槽，已有进度 ID 保持不变
   if (!Object.keys(data.dailies).length && data.daily && !data.daily.term) data.dailies['1A'] = data.daily;
-  if (data.dailies[term] && data.dailies[term].date === t) {
+  const strategy = term === 'QB' ? 'handbook-priority-random-v1' : 'curriculum-sequence-v1';
+  if (data.dailies[term] && data.dailies[term].date === t && data.dailies[term].strategy === strategy) {
     data.daily = data.dailies[term];
     return;
   }
@@ -865,12 +867,14 @@ function ensureDaily() {
   let orderedNew;
   if (term === 'QB' && scope === 'all') {
     orderedNew = shuffle(availableNew.filter(x => x.starred)).concat(shuffle(availableNew.filter(x => !x.starred)));
-  } else {
+  } else if (term === 'QB') {
     orderedNew = shuffle(availableNew);
+  } else {
+    orderedNew = availableNew;
   }
   const fresh = orderedNew.slice(0, data.goal).map(x => x.id);
   data.dailies[term] = {
-    term: term, date: t, scope: scope,
+    term: term, date: t, scope: scope, strategy: strategy,
     queue: [...review.map(id => ({ id, type: 'review' })), ...fresh.map(id => ({ id, type: 'new' }))], pos: 0
   };
   data.daily = data.dailies[term];
@@ -881,8 +885,14 @@ function addMoreNew() {
   const inQueue = new Set(data.daily.queue.map(q => q.id));
   const scope = currentStudyScope();
   const available = wordsForStudyScope(activeWords(), scope).filter(x => prog(x.id).stage === 0 && !inQueue.has(x.id));
-  const ordered = currentTerm() === 'QB' && scope === 'all' ?
-    shuffle(available.filter(x => x.starred)).concat(shuffle(available.filter(x => !x.starred))) : shuffle(available);
+  let ordered;
+  if (currentTerm() === 'QB' && scope === 'all') {
+    ordered = shuffle(available.filter(x => x.starred)).concat(shuffle(available.filter(x => !x.starred)));
+  } else if (currentTerm() === 'QB') {
+    ordered = shuffle(available);
+  } else {
+    ordered = available;
+  }
   ordered.slice(0, data.goal).forEach(x => data.daily.queue.push({ id: x.id, type: 'new' }));
   save();
   renderToday();
@@ -1001,7 +1011,6 @@ function renderLearnCard(body, x) {
     el('span', { class: 'badge new', text: '新词' }),
     el('span', { class: 'badge unit', text: unitText(x.unit, x.term) }),
     el('div', { class: 'word-en', text: x.w }),
-    sylNode(x.syl),
     el('div', { class: 'ipa', text: x.ipa }),
     el('div', { class: 'cn', text: x.cn }),
     exampleNode(x),
