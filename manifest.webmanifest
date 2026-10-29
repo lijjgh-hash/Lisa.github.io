@@ -1,0 +1,19 @@
+{
+  "name": "单词打卡 · 小学英语学习",
+  "short_name": "单词打卡",
+  "description": "适合小学生的单词打卡、练习、默写、跟读和积分奖励应用",
+  "id": "./",
+  "start_url": "./?pwa=1",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eaf7ff",
+  "theme_color": "#2f63d2",
+  "lang": "zh-CN",
+  "categories": ["education", "kids"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

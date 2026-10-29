@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>单词打卡</title>
+<meta name="theme-color" content="#2f63d2">
+<meta name="application-name" content="单词打卡">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="单词打卡">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <style>
   :root {
     --primary:#2f63d2; --primary-dark:#17479f; --sky:#dff3ff; --yellow:#ffd45a; --coral:#ff7d78;
@@ -197,6 +205,14 @@
   .parent-reward-row { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:7px; padding:8px; border-radius:12px; background:#f5f8ff; }
   .parent-reward-row button { border:none; border-radius:9px; padding:6px 8px; background:#ffe4e6; color:#b4233e; cursor:pointer; }
   .redeem-summary { padding:14px; margin:12px 0; border-radius:18px; background:#fff7d6; text-align:center; }
+  .install-button { position:absolute; left:54px; top:14px; min-height:38px; padding:6px 11px; border:2px solid #fff; border-radius:16px;
+                    background:#e7f8ef; color:#13734d; font-weight:800; cursor:pointer; box-shadow:0 4px 10px rgba(19,115,77,.12); }
+  .offline-badge { display:none; position:fixed; z-index:120; right:12px; bottom:calc(12px + env(safe-area-inset-bottom));
+                   padding:7px 11px; border:2px solid #fff; border-radius:16px; background:#687a98; color:#fff; font-weight:800; box-shadow:0 5px 14px rgba(32,55,90,.2); }
+  .offline-badge.show { display:block; }
+  .install-steps { display:grid; gap:9px; margin:14px 0; text-align:left; }
+  .install-step { display:flex; align-items:center; gap:10px; padding:11px; border-radius:15px; background:#f0f6ff; color:#405a83; }
+  .install-step b { flex:0 0 30px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:var(--primary); color:#fff; }
   .parent-button { position:absolute; right:54px; top:14px; min-height:38px; padding:6px 11px; border:2px solid #fff; border-radius:16px;
                    background:#fff4cf; color:#80540a; font-weight:800; cursor:pointer; box-shadow:0 4px 10px rgba(128,84,10,.12); }
   .modal-backdrop { display:none; position:fixed; z-index:200; inset:0; padding:18px; background:rgba(24,43,77,.48); backdrop-filter:blur(5px);
@@ -352,6 +368,7 @@
     .streak-bar b { font-size:18px; }
     .reward-rules { grid-template-columns:repeat(2,1fr); }
     .parent-button { right:38px; top:10px; padding:4px 7px; font-size:12px; }
+    .install-button { left:38px; top:10px; padding:4px 7px; font-size:12px; }
     .parent-grid { grid-template-columns:1fr; }
     .parent-field.full { grid-column:auto; }
     .parent-report { grid-template-columns:repeat(4,1fr); }
@@ -371,6 +388,7 @@
 <body>
 
 <header class="hero">
+  <button id="install-open" class="install-button" aria-label="安装单词打卡应用">📲 安装</button>
   <button id="parent-open" class="parent-button" aria-label="打开家长模式">🔒 家长</button>
   <h1 id="app-title">📒 单词打卡</h1>
   <div class="motto">An apple a day keeps the doctor away. 每天一个苹果，医生远离我。</div>
@@ -389,6 +407,7 @@
   </div>
 </header>
 <div id="reward-toast" class="reward-toast" aria-live="polite"></div>
+<div id="offline-badge" class="offline-badge">📴 离线模式</div>
 <div id="celebration-overlay" class="celebration-overlay" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
   <div id="confetti-container"></div>
   <div class="celebration-box">
@@ -396,6 +415,22 @@
     <div id="celebration-title" class="celebration-title">任务完成！</div>
     <div id="celebration-subtitle" class="celebration-subtitle"></div>
     <button class="btn btn-primary" id="celebration-close" style="width:100%">开心收下，继续加油！</button>
+  </div>
+</div>
+
+<div id="install-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="install-title">
+  <div class="parent-modal" style="max-width:460px">
+    <div class="parent-modal-head"><h2 id="install-title">📲 安装单词打卡</h2><button id="install-close" class="modal-close" aria-label="关闭">×</button></div>
+    <div class="celebrate" style="text-align:center">🏠</div>
+    <div class="cn" style="text-align:center">安装到主屏幕，像 App 一样使用</div>
+    <div id="install-ios-steps" class="install-steps">
+      <div class="install-step"><b>1</b><span>使用 Safari 打开当前网页</span></div>
+      <div class="install-step"><b>2</b><span>点击 Safari 的分享按钮 <strong>□↑</strong></span></div>
+      <div class="install-step"><b>3</b><span>选择“添加到主屏幕”，再点击“添加”</span></div>
+    </div>
+    <div class="hint" style="text-align:center;margin-bottom:12px">首次安装前请保持联网并打开一次页面。安装后，单词、词组和练习可离线使用；语音识别评分仍需网络。</div>
+    <button id="install-native" class="btn btn-primary" style="width:100%;display:none">立即安装</button>
+    <div id="install-status" class="feedback" aria-live="polite"></div>
   </div>
 </div>
 
@@ -1161,6 +1196,80 @@ function importProgressFile(file) {
   };
   reader.readAsText(file, 'utf-8');
 }
+
+// ================= PWA 安装与离线 =================
+let deferredInstallPrompt = null;
+
+function isStandaloneMode() {
+  return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+function updateInstallButton() {
+  document.getElementById('install-open').style.display = isStandaloneMode() ? 'none' : '';
+}
+
+function openInstallModal() {
+  const nativeButton = document.getElementById('install-native');
+  const steps = document.getElementById('install-ios-steps');
+  const status = document.getElementById('install-status');
+  nativeButton.style.display = deferredInstallPrompt ? 'block' : 'none';
+  steps.style.display = deferredInstallPrompt ? 'none' : 'grid';
+  status.textContent = location.protocol === 'https:' ? '' : '安装和离线缓存需要 HTTPS；请使用 GitHub Pages 地址。';
+  status.className = 'feedback ' + (location.protocol === 'https:' ? '' : 'bad');
+  document.getElementById('install-modal').classList.add('show');
+}
+
+function closeInstallModal() { document.getElementById('install-modal').classList.remove('show'); }
+
+async function installNativeApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const choice = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.getElementById('install-native').style.display = 'none';
+  if (choice.outcome === 'accepted') {
+    document.getElementById('install-status').className = 'feedback ok';
+    document.getElementById('install-status').textContent = '✅ 正在安装到主屏幕…';
+  }
+}
+
+function updateOfflineBadge() {
+  document.getElementById('offline-badge').classList.toggle('show', navigator.onLine === false);
+}
+
+function registerPWA() {
+  updateInstallButton();
+  updateOfflineBadge();
+  if (!('serviceWorker' in navigator) || (location.protocol !== 'https:' && location.hostname !== 'localhost')) return;
+  navigator.serviceWorker.register('./sw.js').then(registration => {
+    registration.addEventListener('updatefound', () => {
+      const worker = registration.installing;
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+          document.getElementById('install-status').className = 'feedback ok';
+          document.getElementById('install-status').textContent = '发现新版本，下次打开将自动更新。';
+        }
+      });
+    });
+  }).catch(() => {
+    document.getElementById('install-status').className = 'feedback bad';
+    document.getElementById('install-status').textContent = '离线功能初始化失败，请联网刷新后重试。';
+  });
+}
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  updateInstallButton();
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  closeInstallModal();
+  updateInstallButton();
+});
+window.addEventListener('online', updateOfflineBadge);
+window.addEventListener('offline', updateOfflineBadge);
 
 // ================= 家长模式 =================
 let parentUnlocked = false;
@@ -3098,6 +3207,10 @@ document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', (
   if (tab === 'record') renderRecord();
 }));
 
+document.getElementById('install-open').addEventListener('click', openInstallModal);
+document.getElementById('install-close').addEventListener('click', closeInstallModal);
+document.getElementById('install-native').addEventListener('click', installNativeApp);
+document.getElementById('install-modal').addEventListener('click', event => { if (event.target.id === 'install-modal') closeInstallModal(); });
 document.getElementById('celebration-close').addEventListener('click', closeCelebration);
 document.getElementById('celebration-overlay').addEventListener('click', event => { if (event.target.id === 'celebration-overlay') closeCelebration(); });
 document.getElementById('parent-open').addEventListener('click', openParentModal);
@@ -3230,6 +3343,7 @@ initVoiceSelect();
 initDictSelect();
 applyParentControls();
 startUsageTracking();
+registerPWA();
 </script>
 </body>
 </html>
