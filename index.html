@@ -5,7 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>单词打卡</title>
 <style>
-  :root { --primary:#0b4ea2; --light:#e8f0fb; --bg:#f0f4ff; --text:#1e3a5f; --gray:#64748b; --green:#16a34a; --red:#e11d48; --orange:#f59e0b; }
+  :root {
+    --primary:#2f63d2; --primary-dark:#17479f; --sky:#dff3ff; --yellow:#ffd45a; --coral:#ff7d78;
+    --purple:#8c7cf0; --mint:#67d6b2; --light:#edf6ff; --bg:#f5f9ff; --card-bg:#fff;
+    --text:#243b64; --gray:#667895; --green:#31b97b; --red:#ef5b6a; --orange:#f5a623;
+  }
   * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
   body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text);
          min-height:100vh; display:flex; flex-direction:column; align-items:center; overflow-x:hidden;
@@ -16,7 +20,8 @@
   .term-picker { display:flex; justify-content:center; align-items:center; gap:7px; margin-top:9px; }
   .term-picker label { font-size:13px; color:var(--gray); }
   .term-picker select { width:min(250px,70vw); min-width:0; margin:0; padding:6px 28px 6px 10px; border-color:#93c5fd; color:var(--primary); font-weight:700; }
-  .streak-bar { display:flex; justify-content:center; gap:14px; margin-top:8px; font-size:13px; }
+  .streak-bar { display:flex; width:100%; max-width:100%; justify-content:center; gap:10px 14px; margin-top:8px; font-size:13px; flex-wrap:wrap; }
+  .streak-bar > span { white-space:nowrap; }
   .streak-bar b { color:var(--primary); font-size:16px; }
 
   .tabs { position:sticky; top:0; z-index:20; display:flex; width:100%; max-width:760px; gap:6px; margin-bottom:14px;
@@ -115,7 +120,7 @@
   .wl-row .box::after { content:""; position:absolute; inset:-8px -3px; }
 
   /* 日历 */
-  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
   .stat { background:#fff; border-radius:12px; padding:12px 6px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,.05); }
   .stat b { display:block; font-size:24px; color:var(--primary); } .stat span { font-size:12px; color:var(--gray); }
   .cal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-weight:700; }
@@ -134,6 +139,97 @@
   .today-tools select { min-width:0; }
   .backup-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
   .backup-status { min-height:20px; margin-top:8px; font-size:12px; color:var(--gray); }
+  .reward-card { background:linear-gradient(135deg,#fff7d6,#fffbeb); border:1px solid #fde68a; border-radius:16px; padding:16px; margin-bottom:14px; }
+  .reward-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .reward-points { color:#b45309; font-size:30px; font-weight:800; white-space:nowrap; }
+  .reward-level { font-size:18px; font-weight:800; color:#92400e; }
+  .reward-progress { height:9px; margin:10px 0 5px; border-radius:5px; overflow:hidden; background:#fde68a; }
+  .reward-progress > div { height:100%; background:linear-gradient(90deg,#f59e0b,#f97316); transition:width .3s; }
+  .reward-badges { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .reward-badge { padding:5px 9px; border-radius:14px; background:#fff; color:#92400e; font-size:13px; font-weight:700; border:1px solid #fde68a; }
+  .reward-badge.locked { filter:grayscale(1); opacity:.45; }
+  .reward-rules { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:12px; font-size:13px; color:#78350f; }
+  .reward-rules span { background:rgba(255,255,255,.65); padding:6px; border-radius:8px; text-align:center; }
+  .reward-toast { position:fixed; z-index:100; left:50%; top:18%; transform:translate(-50%,-10px); padding:10px 18px;
+                  border-radius:24px; background:#f59e0b; color:#fff; font-size:18px; font-weight:800; box-shadow:0 8px 24px rgba(180,83,9,.28);
+                  opacity:0; pointer-events:none; transition:all .25s; }
+  .reward-toast.show { opacity:1; transform:translate(-50%,0); }
+
+  /* 一年级儿童主题 */
+  body {
+    background:
+      radial-gradient(circle at 8% 8%, rgba(255,212,90,.30) 0 70px, transparent 72px),
+      radial-gradient(circle at 94% 15%, rgba(140,124,240,.15) 0 90px, transparent 92px),
+      radial-gradient(circle at 15% 85%, rgba(103,214,178,.16) 0 110px, transparent 112px),
+      linear-gradient(180deg,#eaf7ff 0,#f7f5ff 52%,#fff9e8 100%);
+    background-attachment:fixed;
+  }
+  body::before, body::after { position:fixed; z-index:-1; pointer-events:none; filter:drop-shadow(0 6px 12px rgba(53,104,212,.10)); }
+  body::before { content:"☁️"; left:3vw; top:12vh; font-size:54px; opacity:.45; }
+  body::after { content:"🌈"; right:3vw; bottom:5vh; font-size:62px; opacity:.25; }
+  .hero {
+    position:relative; overflow:hidden; max-width:760px; padding:16px 18px 14px; margin-bottom:10px;
+    border:2px solid rgba(255,255,255,.95); border-radius:24px;
+    background:linear-gradient(135deg,rgba(255,255,255,.92),rgba(232,246,255,.92));
+    box-shadow:0 10px 28px rgba(53,104,212,.12);
+  }
+  .hero::before { content:"⭐"; position:absolute; left:18px; top:14px; font-size:24px; transform:rotate(-14deg); }
+  .hero::after { content:"🎈"; position:absolute; right:17px; top:12px; font-size:28px; transform:rotate(8deg); }
+  .hero h1 { color:var(--primary-dark); letter-spacing:1px; text-shadow:0 2px 0 #fff; }
+  .hero .motto { color:#6e7fa2; }
+  .term-picker label { color:var(--primary-dark); font-weight:800; }
+  .term-picker select, select, input[type=number], input[type=search], input[type=text] {
+    color:var(--text); border:2px solid #c9dcff; border-radius:15px; background:#fff;
+    box-shadow:inset 0 1px 0 #fff,0 3px 8px rgba(53,104,212,.07);
+  }
+  .term-picker select:focus, select:focus, input:focus { border-color:var(--primary); box-shadow:0 0 0 4px rgba(53,104,212,.12); }
+  .streak-bar > span { padding:5px 9px; border-radius:14px; background:rgba(255,255,255,.72); }
+  .tabs {
+    border:2px solid rgba(255,255,255,.85); border-radius:27px; padding:6px;
+    background:rgba(255,255,255,.78); box-shadow:0 8px 22px rgba(53,104,212,.10);
+  }
+  .tab { color:#35558d; background:#eaf2ff; border:2px solid transparent; box-shadow:none; }
+  .tab:nth-child(3n+2) { background:#eef8df; }
+  .tab:nth-child(3n) { background:#fff0e7; }
+  .tab.active { color:#fff; border-color:#fff; background:linear-gradient(135deg,var(--primary),var(--purple)); box-shadow:0 6px 14px rgba(53,104,212,.28); transform:translateY(-1px); }
+  .card {
+    overflow:hidden; border:3px solid rgba(255,255,255,.96); border-radius:25px;
+    background:linear-gradient(160deg,#fff 0,#fbfdff 70%,#f1f8ff 100%);
+    box-shadow:0 12px 28px rgba(53,104,212,.13),inset 0 -3px 0 rgba(53,104,212,.04);
+  }
+  .badge { padding:5px 11px; border-radius:14px; font-weight:800; box-shadow:0 3px 8px rgba(0,0,0,.10); }
+  .badge.new { background:linear-gradient(135deg,#ffb83f,#ff8e4f); }
+  .badge.review { background:linear-gradient(135deg,#49a5ff,#6878ef); }
+  .badge.unit { background:linear-gradient(135deg,#8b9db7,#6c7f9e); }
+  .word-en { color:var(--primary-dark); text-shadow:0 3px 0 #dceaff; }
+  .ipa { color:#566b8f; }
+  .cn { color:#263f69; font-weight:700; }
+  .example { border:2px solid #d8e8ff; border-left:6px solid #68a5ff; border-radius:16px; background:linear-gradient(90deg,#f0f7ff,#fff); }
+  .example-en { color:#2052ae; }
+  .progress { height:12px; padding:2px; border-radius:8px; background:#dcecff; box-shadow:inset 0 2px 4px rgba(53,104,212,.10); }
+  .progress > div { border-radius:6px; background:linear-gradient(90deg,var(--mint),#52aef2,var(--purple)); }
+  .btn { border:2px solid rgba(255,255,255,.82); box-shadow:0 6px 13px rgba(53,104,212,.16); transition:transform .15s,box-shadow .15s; }
+  .btn:active { transform:translateY(2px) scale(.99); box-shadow:0 2px 5px rgba(53,104,212,.15); }
+  .btn-primary { background:linear-gradient(135deg,var(--primary),var(--purple)); }
+  .btn-green { background:linear-gradient(135deg,#159d64,#45c187); }
+  .btn-red { background:linear-gradient(135deg,#f05c70,#ff8a72); }
+  .btn-gray { background:linear-gradient(135deg,#f2f6fc,#e5edfa); color:#4d6388; }
+  .box { border-color:#7f94b4; background:#fff; }
+  .box.on { background:linear-gradient(135deg,#24b877,#63d4a0); border-color:#23a86e; box-shadow:0 2px 6px rgba(49,185,123,.25); }
+  .quiz-option { border:3px solid #d7e6ff; border-radius:18px; box-shadow:0 5px 12px rgba(53,104,212,.08); }
+  .quiz-option:hover { border-color:#86afff; background:#f5f9ff; }
+  .unit-title { background:linear-gradient(100deg,var(--primary),#6598ed); border-radius:17px 17px 5px 5px; box-shadow:0 5px 12px rgba(53,104,212,.18); }
+  .wl { border-radius:6px 6px 17px 17px; }
+  .wl-row:nth-child(odd) { background:#f0f7ff; }
+  .stat { border:2px solid #fff; border-radius:18px; background:linear-gradient(145deg,#fff,#eef6ff); box-shadow:0 7px 16px rgba(53,104,212,.10); }
+  .stat:nth-child(2) { background:linear-gradient(145deg,#fff,#fff5dc); }
+  .stat:nth-child(3) { background:linear-gradient(145deg,#fff,#eafbf4); }
+  .stat:nth-child(4) { background:linear-gradient(145deg,#fff,#f4edff); }
+  .reward-card { border:3px solid #fff3bb; border-radius:24px; background:linear-gradient(135deg,#fff9dc,#fff0c2); box-shadow:0 10px 24px rgba(245,166,35,.18); }
+  .cal .day { border:1px solid #e1eaff; background:#f5f8ff; }
+  .cal .day.done { border-color:#47c891; background:linear-gradient(135deg,#31b97b,#69d4a2); }
+  .mistake-item { border:2px solid #fff; border-radius:15px; box-shadow:0 5px 12px rgba(53,104,212,.08); }
+  .reward-toast { background:linear-gradient(135deg,#ffb328,#ff7c57); border:3px solid #fff; }
 
   /* 整体大字体模式 */
   body { font-size:17px; }
@@ -174,9 +270,18 @@
     header .motto { width:100%; overflow-wrap:anywhere; }
     .term-picker { width:100%; }
     .term-picker select { width:min(210px,55vw); max-width:55vw; }
+    .hero { padding-left:10px; padding-right:10px; }
+    .hero::before, .hero::after { top:9px; font-size:18px; }
+    .hero::before { left:10px; }
+    .hero::after { right:10px; }
     .list-toolbar { grid-template-columns:1fr 1fr; }
     .list-toolbar input { grid-column:1 / -1; }
     .today-tools { grid-template-columns:1fr; }
+    .stats { grid-template-columns:repeat(2,1fr); }
+    .streak-bar { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; }
+    .streak-bar > span { padding:5px 2px; font-size:13px; }
+    .streak-bar b { font-size:18px; }
+    .reward-rules { grid-template-columns:repeat(2,1fr); }
     .word-en { font-size:clamp(27px,9vw,38px); }
     .wl-row { padding-left:7px; padding-right:7px; }
     .wl-row .box { width:21px; height:21px; line-height:17px; }
@@ -190,7 +295,7 @@
 </head>
 <body>
 
-<header>
+<header class="hero">
   <h1 id="app-title">📒 单词打卡</h1>
   <div class="motto">An apple a day keeps the doctor away. 每天一个苹果，医生远离我。</div>
   <div class="term-picker">
@@ -204,23 +309,25 @@
   <div class="streak-bar">
     <span>🔥 连续 <b id="hd-streak">0</b> 天</span>
     <span>✅ 已掌握 <b id="hd-mastered">0</b>/<span id="hd-total">0</span></span>
+    <span>⭐ 积分 <b id="hd-points">0</b></span>
   </div>
 </header>
+<div id="reward-toast" class="reward-toast" aria-live="polite"></div>
 
 <nav class="tabs">
-  <button class="tab active" data-tab="today">今日打卡</button>
-  <button class="tab" data-tab="list">单词表</button>
-  <button class="tab" data-tab="practice">练习</button>
-  <button class="tab" data-tab="voice">录音</button>
-  <button class="tab" data-tab="dictation">默写</button>
-  <button class="tab" data-tab="record">打卡记录</button>
+  <button class="tab active" data-tab="today">🏠 今日</button>
+  <button class="tab" data-tab="list">📚 单词</button>
+  <button class="tab" data-tab="practice">🎮 练习</button>
+  <button class="tab" data-tab="voice">🎤 跟读</button>
+  <button class="tab" data-tab="dictation">✏️ 默写</button>
+  <button class="tab" data-tab="record">🏆 成长</button>
 </nav>
 
 <!-- 今日打卡 -->
 <section id="page-today" class="page active">
   <div class="today-tools">
     <select id="today-scope" aria-label="选择今日学习范围"></select>
-    <button class="btn btn-primary" id="today-apply-scope">应用范围</button>
+    <button class="btn btn-primary" id="today-apply-scope">✨ 开始学习</button>
   </div>
   <div class="progress"><div id="today-bar" style="width:0"></div></div>
   <div class="progress-text" id="today-progress"></div>
@@ -267,7 +374,7 @@
       <option value="sentence">例句选词填空</option>
     </select>
   </div>
-  <button class="btn btn-primary" id="practice-start" style="width:100%;margin-bottom:12px">开始练习</button>
+  <button class="btn btn-primary" id="practice-start" style="width:100%;margin-bottom:12px">🚀 开始闯关</button>
   <div id="practice-area">
     <div class="card">
       <div class="celebrate" style="font-size:44px">✏️</div>
@@ -328,8 +435,8 @@
   <input type="text" id="dict-input" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text" aria-label="默写英文输入">
   <div class="feedback" id="dict-fb"></div>
   <div class="btn-group">
-    <button class="btn btn-green" id="dict-check">提交</button>
-    <button class="btn btn-gray" id="dict-next">下一个</button>
+    <button class="btn btn-green" id="dict-check">✅ 检查答案</button>
+    <button class="btn btn-gray" id="dict-next">⏭ 下一题</button>
   </div>
 </section>
 
@@ -339,6 +446,19 @@
     <div class="stat"><b id="st-streak">0</b><span>连续打卡</span></div>
     <div class="stat"><b id="st-days">0</b><span>累计打卡</span></div>
     <div class="stat"><b id="st-learned">0</b><span>已学内容</span></div>
+    <div class="stat"><b id="st-points">0</b><span>累计积分</span></div>
+  </div>
+  <div class="reward-card">
+    <div class="reward-head">
+      <div><div class="reward-level" id="reward-level">🌱 学习新手</div><div class="hint" id="reward-next"></div></div>
+      <div class="reward-points">⭐ <span id="reward-points">0</span></div>
+    </div>
+    <div class="reward-progress"><div id="reward-progress-bar" style="width:0"></div></div>
+    <div class="reward-badges" id="reward-badges"></div>
+    <div class="reward-rules">
+      <span>学新词 +5</span><span>复习正确 +3</span><span>练习正确 +2</span>
+      <span>默写正确 +3</span><span>发音达标 +2～7</span><span>完成今日 +10</span>
+    </div>
   </div>
   <div class="card" style="padding:14px">
     <div class="cal-head">
@@ -681,7 +801,8 @@ function maxStageFor(id) { return BY_ID[id] && BY_ID[id].term === 'QB' ? 3 : MAX
 // ================= 存储 =================
 const KEY = 'word_checkin_v1';
 const defaultData = () => ({
-  version: 2, term: '1A', goal: 5, progress: {}, checkins: {}, mistakes: [], scores: {},
+  version: 3, term: '1A', goal: 5, progress: {}, checkins: {}, mistakes: [], scores: {},
+  rewards: { points: 0, ledger: {} },
   studyScopes: { '1A': 'all', '1B': 'all', 'QB': 'all' }, dailies: {}, daily: null
 });
 let storageAvailable = true;
@@ -739,6 +860,21 @@ function normalizeStoredData(raw) {
       date: validDate(item.date) ? item.date : ''
     };
   });
+  if (raw.rewards && typeof raw.rewards === 'object') {
+    clean.rewards.points = Math.max(0, Math.min(10000000, Math.floor(Number(raw.rewards.points) || 0)));
+    if (raw.rewards.ledger && typeof raw.rewards.ledger === 'object') Object.keys(raw.rewards.ledger).slice(0, 10000).forEach(key => {
+      const item = raw.rewards.ledger[key];
+      if (!item || typeof item !== 'object') return;
+      const rawPoints = Math.floor(Number(item.points) || 0);
+      if (rawPoints < 1) return;
+      const points = Math.min(100, rawPoints);
+      clean.rewards.ledger[String(key).slice(0, 180)] = {
+        points: points,
+        reason: typeof item.reason === 'string' ? item.reason.slice(0, 80) : '',
+        date: validDate(item.date) ? item.date : ''
+      };
+    });
+  }
   if (raw.studyScopes && typeof raw.studyScopes === 'object') ['1A','1B','QB'].forEach(term => {
     clean.studyScopes[term] = validScope(term, raw.studyScopes[term]) ? raw.studyScopes[term] : 'all';
   });
@@ -838,6 +974,67 @@ function addMistake(id) {
   if (!data.mistakes.includes(id)) data.mistakes.push(id);
 }
 
+const REWARD_LEVELS = [
+  { min: 0, name: '🌱 学习新手' },
+  { min: 100, name: '🌟 学习小达人' },
+  { min: 300, name: '📚 词汇小能手' },
+  { min: 600, name: '🧠 记忆小博士' },
+  { min: 1000, name: '🏆 英语小明星' },
+  { min: 1800, name: '👑 单词大王' }
+];
+let rewardToastTimer = null;
+
+function rewardData() {
+  if (!data.rewards || typeof data.rewards !== 'object') data.rewards = { points: 0, ledger: {} };
+  if (!data.rewards.ledger || typeof data.rewards.ledger !== 'object') data.rewards.ledger = {};
+  data.rewards.points = Math.max(0, Number(data.rewards.points) || 0);
+  return data.rewards;
+}
+
+function rewardLevel(points) {
+  let index = 0;
+  REWARD_LEVELS.forEach((level, i) => { if (points >= level.min) index = i; });
+  return { current: REWARD_LEVELS[index], next: REWARD_LEVELS[index + 1] || null };
+}
+
+function showRewardToast(points, reason) {
+  const toast = document.getElementById('reward-toast');
+  toast.textContent = `⭐ +${points}　${reason}`;
+  toast.classList.add('show');
+  if (rewardToastTimer) clearTimeout(rewardToastTimer);
+  rewardToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+function awardPoints(key, points, reason) {
+  const rewards = rewardData();
+  if (rewards.ledger[key]) return false;
+  rewards.ledger[key] = { points: points, reason: reason, date: today() };
+  rewards.points += points;
+  save();
+  renderHeader();
+  showRewardToast(points, reason);
+  return true;
+}
+
+function renderRewards() {
+  const points = rewardData().points;
+  const level = rewardLevel(points);
+  document.getElementById('st-points').textContent = points;
+  document.getElementById('reward-points').textContent = points;
+  document.getElementById('reward-level').textContent = level.current.name;
+  const start = level.current.min;
+  const end = level.next ? level.next.min : start;
+  const percent = level.next ? Math.max(0, Math.min(100, (points - start) / (end - start) * 100)) : 100;
+  document.getElementById('reward-progress-bar').style.width = percent + '%';
+  document.getElementById('reward-next').textContent = level.next ? `再得 ${level.next.min - points} 分升级为 ${level.next.name}` : '已达到最高等级！';
+  const badges = document.getElementById('reward-badges');
+  badges.innerHTML = '';
+  REWARD_LEVELS.slice(1).forEach(item => badges.append(el('span', {
+    class: 'reward-badge' + (points < item.min ? ' locked' : ''),
+    text: `${points >= item.min ? '✓' : '🔒'} ${item.name.replace(/^\S+\s/, '')} ${item.min}`
+  })));
+}
+
 function currentStudyScope() {
   if (!data.studyScopes) data.studyScopes = { '1A': 'all', '1B': 'all', 'QB': 'all' };
   return data.studyScopes[currentTerm()] || 'all';
@@ -933,7 +1130,10 @@ function addMoreNew() {
 
 function finishItem() {
   data.daily.pos++;
-  if (data.daily.pos >= data.daily.queue.length) data.checkins[today()] = true;
+  if (data.daily.pos >= data.daily.queue.length) {
+    data.checkins[today()] = true;
+    awardPoints(`daily:${currentTerm()}:${today()}`, 10, '完成今日任务');
+  }
   save();
   renderHeader();
   renderToday();
@@ -1038,10 +1238,17 @@ function renderToday() {
   else renderReviewCard(body, x);
 }
 
+function completeNewWord(x) {
+  const firstLearn = prog(x.id).stage === 0;
+  setStage(x.id, 1);
+  if (firstLearn) awardPoints(`learn:${x.id}`, 5, '学会新内容');
+  finishItem();
+}
+
 // 新词：学习卡片
 function renderLearnCard(body, x) {
   body.append(el('div', { class: 'card' }, [
-    el('span', { class: 'badge new', text: '新词' }),
+    el('span', { class: 'badge new', text: '🌱 新词' }),
     el('span', { class: 'badge unit', text: unitText(x.unit, x.term) }),
     el('div', { class: 'word-en', text: x.w }),
     el('div', { class: 'ipa', text: x.ipa }),
@@ -1051,7 +1258,7 @@ function renderLearnCard(body, x) {
     el('div', {}, boxesNode(x.id, false))
   ]));
   body.append(el('div', { class: 'btn-group' }, [
-    el('button', { class: 'btn btn-green', text: '学会了 ✓', onclick: () => { setStage(x.id, 1); finishItem(); } })
+    el('button', { class: 'btn btn-green', text: '🌟 我学会啦　+5', onclick: () => completeNewWord(x) })
   ]));
   speak(x.w);
 }
@@ -1073,9 +1280,12 @@ function renderReviewCard(body, x) {
     const right = normalize(input.value) === normalize(x.w);
     reveal.append(sylNode(x.syl), el('div', { class: 'ipa', text: x.ipa }), exampleNode(x));
     if (right) {
-      setStage(x.id, st + 1);
+      const nextStage = Math.min(maxStageFor(x.id), st + 1);
+      setStage(x.id, nextStage);
+      const reviewRewarded = awardPoints(`review:${x.id}:${nextStage}`, 3, '复习正确');
       fb.className = 'feedback ok';
-      fb.textContent = st + 1 >= maxStageFor(x.id) ? '✅ 正确！这个词已掌握 🏅' : `✅ 正确！打卡第 ${st + 1} 格`;
+      const reviewMessage = st + 1 >= maxStageFor(x.id) ? '✅ 正确！这个词已掌握 🏅' : `✅ 正确！打卡第 ${st + 1} 格`;
+      fb.textContent = reviewMessage + (reviewRewarded ? '　⭐ +3' : '');
       input.style.borderColor = 'var(--green)';
       data.mistakes = data.mistakes.filter(id => id !== x.id);
     } else {
@@ -1099,7 +1309,7 @@ function renderReviewCard(body, x) {
   );
 
   body.append(el('div', { class: 'card' }, [
-    el('span', { class: 'badge review', text: '复习' }),
+    el('span', { class: 'badge review', text: '🔁 复习' }),
     el('span', { class: 'badge unit', text: unitText(x.unit, x.term) }),
     el('div', { class: 'cn', style: 'font-size:26px;margin-top:22px', text: x.cn }),
     el('button', { class: 'btn-icon', 'aria-label': '听发音', text: '🔊', onclick: () => speak(x.w) }),
@@ -1379,8 +1589,9 @@ function answerPractice(chosenId) {
   const fb = document.getElementById('practice-feedback');
   if (right) {
     practice.score++;
+    const practiceRewarded = awardPoints(`practice:${today()}:${x.id}`, 2, '练习答对');
     fb.className = 'feedback ok';
-    fb.textContent = '✅ 回答正确！';
+    fb.textContent = practiceRewarded ? '✅ 回答正确！　⭐ +2' : '✅ 回答正确！';
   } else {
     addMistake(x.id);
     save();
@@ -1670,6 +1881,9 @@ function saveAutomaticScore(x, result) {
     transcript: result.transcript,
     date: today()
   };
+  if (result.score >= 60) awardPoints(`pronunciation:${x.id}:60`, 2, '发音达标');
+  if (result.score >= 80) awardPoints(`pronunciation:${x.id}:80`, 2, '发音优秀');
+  if (result.score >= 95) awardPoints(`pronunciation:${x.id}:95`, 3, '发音满星');
   save();
 }
 
@@ -1966,7 +2180,8 @@ function checkDict() {
   const x = BY_ID[dict.list[dict.idx]];
   dict.answered = true;
   if (normalize(input.value) === normalize(x.w)) {
-    fb.className = 'feedback ok'; fb.textContent = '✅ 正确！' + x.ipa;
+    const dictRewarded = awardPoints(`dictation:${today()}:${x.id}`, 3, '默写正确');
+    fb.className = 'feedback ok'; fb.textContent = '✅ 正确！' + x.ipa + (dictRewarded ? '　⭐ +3' : '');
     input.style.borderColor = 'var(--green)';
     speak(x.w);
     setTimeout(nextDict, 1200);
@@ -1996,6 +2211,7 @@ let calMonth = (() => { const n = new Date(); return { y: n.getFullYear(), m: n.
 
 function renderRecord() {
   const termMistakes = data.mistakes.filter(id => BY_ID[id] && BY_ID[id].term === currentTerm());
+  renderRewards();
   document.getElementById('st-streak').textContent = streak();
   document.getElementById('st-days').textContent = Object.keys(data.checkins).length;
   document.getElementById('st-learned').textContent = activeWords().filter(x => prog(x.id).stage > 0).length;
@@ -2039,6 +2255,7 @@ function renderHeader() {
   document.getElementById('hd-streak').textContent = streak();
   document.getElementById('hd-mastered').textContent = words.filter(x => prog(x.id).stage >= maxStageFor(x.id)).length;
   document.getElementById('hd-total').textContent = words.length;
+  document.getElementById('hd-points').textContent = rewardData().points;
 }
 
 // ================= 事件绑定 =================
