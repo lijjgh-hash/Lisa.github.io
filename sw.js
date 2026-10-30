@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'word-checkin-';
-const CACHE_NAME = CACHE_PREFIX + 'v31';
+const CACHE_NAME = CACHE_PREFIX + 'v32';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,7 +18,11 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  if (!event.data) return;
+  if (event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data.type === 'GET_VERSION' && event.ports && event.ports[0]) {
+    event.ports[0].postMessage({ version: CACHE_NAME.slice(CACHE_PREFIX.length) });
+  }
 });
 
 self.addEventListener('activate', event => {
