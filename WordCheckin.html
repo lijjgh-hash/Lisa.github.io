@@ -1528,7 +1528,8 @@ function mergeSyncData(local, remote) {
 const CLOUD_STORE_KEY = 'word_checkin_cloud_v1';
 const CLOUD_TABLE = 'word_checkin_sync';
 // 可以直接在这里填写 Project URL 和 anon/publishable key，所有设备就不用再手动输入
-const CLOUD_DEFAULT = { url: '', anonKey: '' };
+const CLOUD_DEFAULT = { url: 'https://htopxmpunyjgjkyojfce.supabase.co', anonKey: 'sb_publishable_y0pPbxIuYXcrLHyCbrKRNw_iteO-EbE' };
+const CLOUD_BUILT_IN = !!(CLOUD_DEFAULT.url && CLOUD_DEFAULT.anonKey);
 let cloud = loadCloudConfig();
 let cloudSyncing = false;
 let cloudPending = false;
@@ -1541,8 +1542,9 @@ function loadCloudConfig() {
   try { raw = JSON.parse(localStorage.getItem(CLOUD_STORE_KEY) || 'null'); } catch (error) { raw = null; }
   const config = { url: CLOUD_DEFAULT.url, anonKey: CLOUD_DEFAULT.anonKey, email: '', session: null, lastSyncAt: 0 };
   if (!raw || typeof raw !== 'object') return config;
-  if (typeof raw.url === 'string' && raw.url) config.url = raw.url;
-  if (typeof raw.anonKey === 'string' && raw.anonKey) config.anonKey = raw.anonKey;
+  // 页面里已内置项目地址时，总是使用内置值，避免设备上残留旧地址
+  if (!CLOUD_BUILT_IN && typeof raw.url === 'string' && raw.url) config.url = raw.url;
+  if (!CLOUD_BUILT_IN && typeof raw.anonKey === 'string' && raw.anonKey) config.anonKey = raw.anonKey;
   if (typeof raw.email === 'string') config.email = raw.email.slice(0, 120);
   const s = raw.session;
   if (s && typeof s.access_token === 'string' && typeof s.refresh_token === 'string' && typeof s.user_id === 'string') {
@@ -1757,7 +1759,7 @@ function cloudTimeText(ms) {
 }
 function renderCloudPanel() {
   const ready = cloudReady();
-  document.getElementById('cloud-config').style.display = ready ? 'none' : '';
+  document.getElementById('cloud-config').style.display = ready || CLOUD_BUILT_IN ? 'none' : '';
   document.getElementById('cloud-login').style.display = ready ? 'none' : '';
   document.getElementById('cloud-account').style.display = ready ? '' : 'none';
   document.getElementById('cloud-url').value = cloud.url || '';
@@ -1768,8 +1770,8 @@ function renderCloudPanel() {
   document.getElementById('cloud-sync-now').disabled = cloudSyncing;
 }
 function cloudSignIn(isSignup) {
-  const url = normalizeCloudUrl(document.getElementById('cloud-url').value);
-  const key = document.getElementById('cloud-key').value.trim();
+  const url = normalizeCloudUrl(CLOUD_BUILT_IN ? CLOUD_DEFAULT.url : document.getElementById('cloud-url').value);
+  const key = CLOUD_BUILT_IN ? CLOUD_DEFAULT.anonKey : document.getElementById('cloud-key').value.trim();
   const email = document.getElementById('cloud-email').value.trim();
   const passwordInput = document.getElementById('cloud-password');
   const password = passwordInput.value;
@@ -1873,7 +1875,7 @@ function updateOfflineBadge() {
 }
 
 // 发布新版本时：这里和 sw.js 的 CACHE_NAME 一起加 1
-const APP_VERSION = 'v33';
+const APP_VERSION = 'v34';
 let waitingWorker = null;
 let updateRequested = false;
 let swRegistration = null;
