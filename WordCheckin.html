@@ -200,6 +200,9 @@
   .reward-cost { color:#b56808; font-size:18px; font-weight:800; white-space:nowrap; }
   .reward-item .btn { width:100%; }
   .reward-history { margin-bottom:14px; }
+  .points-log { max-height:420px; overflow-y:auto; }
+  .points-log .reward-history-row span { font-size:14px; }
+  .points-log .reward-history-row b { flex:0 0 auto; font-size:17px; }
   .reward-history-row { display:flex; justify-content:space-between; gap:10px; padding:9px 11px; border-bottom:1px dashed #d8e4f5; color:#536887; }
   .parent-reward-list { display:flex; flex-direction:column; gap:7px; margin-top:10px; }
   .parent-reward-row { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:7px; padding:8px; border-radius:12px; background:#f5f8ff; }
@@ -210,6 +213,16 @@
   .offline-badge { display:none; position:fixed; z-index:120; right:12px; bottom:calc(12px + env(safe-area-inset-bottom));
                    padding:7px 11px; border:2px solid #fff; border-radius:16px; background:#687a98; color:#fff; font-weight:800; box-shadow:0 5px 14px rgba(32,55,90,.2); }
   .offline-badge.show { display:block; }
+  .update-banner { display:none; position:fixed; z-index:130; left:12px; right:12px; margin:0 auto; bottom:calc(14px + env(safe-area-inset-bottom));
+                   max-width:520px; box-sizing:border-box; align-items:center; gap:10px; flex-wrap:wrap;
+                   padding:12px 14px; border:3px solid #fff; border-radius:20px; background:#fff7d6; color:#7a5200; font-weight:800;
+                   box-shadow:0 8px 22px rgba(122,82,0,.22); }
+  .update-banner.show { display:flex; }
+  .update-banner .update-text { flex:1 1 180px; font-size:18px; }
+  .update-banner button { min-height:44px; padding:8px 14px; border:0; border-radius:14px; font-size:17px; font-weight:800; cursor:pointer; }
+  .update-banner .update-now { background:#2fb36f; color:#fff; }
+  .update-banner .update-later { background:#eee3c0; color:#7a5200; }
+  .update-banner button:disabled { opacity:.6; cursor:default; }
   .install-steps { display:grid; gap:9px; margin:14px 0; text-align:left; }
   .install-step { display:flex; align-items:center; gap:10px; padding:11px; border-radius:15px; background:#f0f6ff; color:#405a83; }
   .install-step b { flex:0 0 30px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:var(--primary); color:#fff; }
@@ -234,6 +247,13 @@
   .parent-report { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:10px; }
   .report-day { padding:8px 3px; border-radius:12px; text-align:center; background:#eef5ff; color:#52678a; font-size:12px; }
   .report-day.done { background:#dcf8eb; color:#187a52; }
+  .weekly-summary { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .weekly-item { display:flex; flex-direction:column; gap:3px; padding:10px 12px; border-radius:14px; background:#f3f8ff; border:2px solid #e2ecff; }
+  .weekly-item span { color:#5d7193; font-size:14px; }
+  .weekly-item b { color:#17479f; font-size:17px; }
+  .weekly-mistakes { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .weekly-mistakes .hint { width:100%; }
+  .weekly-chip { padding:4px 9px; border-radius:12px; background:#fff0f2; color:#b4233e; font-size:13px; font-weight:700; }
   .report-day b { display:block; font-size:15px; color:inherit; }
   .parent-only { display:none !important; }
   body.parent-unlocked .parent-only { display:block !important; }
@@ -287,6 +307,8 @@
   .badge.review { background:linear-gradient(135deg,#49a5ff,#6878ef); }
   .badge.unit { background:linear-gradient(135deg,#8b9db7,#6c7f9e); }
   .word-en { color:var(--primary-dark); text-shadow:0 3px 0 #dceaff; }
+  .word-picture { font-size:76px; line-height:1.1; margin:12px 0 2px; filter:drop-shadow(0 6px 8px rgba(53,104,212,.14)); }
+  .picture-prompt { font-size:92px; line-height:1.2; filter:drop-shadow(0 7px 9px rgba(53,104,212,.15)); }
   .ipa { color:#566b8f; }
   .cn { color:#263f69; font-weight:700; }
   .example { border:2px solid #d8e8ff; border-left:6px solid #68a5ff; border-radius:16px; background:linear-gradient(90deg,#f0f7ff,#fff); }
@@ -408,6 +430,11 @@
 </header>
 <div id="reward-toast" class="reward-toast" aria-live="polite"></div>
 <div id="offline-badge" class="offline-badge">📴 离线模式</div>
+<div id="update-banner" class="update-banner" role="status" aria-live="polite">
+  <span class="update-text">✨ 发现新版本</span>
+  <button type="button" id="update-now" class="update-now">立即更新</button>
+  <button type="button" id="update-later" class="update-later">稍后</button>
+</div>
 <div id="celebration-overlay" class="celebration-overlay" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
   <div id="confetti-container"></div>
   <div class="celebration-box">
@@ -452,6 +479,8 @@
         <div class="parent-field"><div class="switch-row"><label for="parent-dictation">开放默写</label><input type="checkbox" id="parent-dictation"></div></div>
         <div class="parent-field"><div class="switch-row"><label for="parent-voice">开放跟读和评分</label><input type="checkbox" id="parent-voice"></div></div>
         <div class="parent-field"><div class="switch-row"><label for="parent-reduce-motion">减少庆祝动画</label><input type="checkbox" id="parent-reduce-motion"></div></div>
+        <div class="parent-field"><label for="parent-point-cap">每天最多获得积分</label><input type="number" id="parent-point-cap" min="0" max="1000"><div class="hint">填 0 表示不限；家长奖励不计入</div></div>
+        <div class="parent-field"><label for="parent-redeem-limit">每个奖励每天最多兑换</label><input type="number" id="parent-redeem-limit" min="0" max="20"><div class="hint">单位：次；填 0 表示不限</div></div>
         <div class="parent-field"><label for="parent-core-level">核心词组最高难度</label><select id="parent-core-level"><option value="1">🌱 入门（310条·一年级推荐）</option><option value="2">🌼 基础（累计691条）</option><option value="3">🌟 提高（累计800条）</option><option value="4">🚀 进阶（全部1000条）</option></select></div>
         <div class="parent-field"><label for="parent-term">设置哪套教材</label><select id="parent-term"><option value="1A">一年级上册</option><option value="1B">一年级下册</option><option value="QB">核心必背词组</option></select></div>
         <div class="parent-field"><label for="parent-scope">每日学习范围</label><select id="parent-scope"></select></div>
@@ -463,7 +492,12 @@
         <div class="parent-field full"><label for="parent-points-adjust">积分调整</label><input type="number" id="parent-points-adjust" min="-1000" max="1000" value="0"><div class="hint">正数表示家长奖励，负数表示兑换奖励；每次保存后归零。</div></div>
         <div class="parent-field full"><label for="parent-new-pin">修改家长密码</label><input type="password" inputmode="numeric" maxlength="6" id="parent-new-pin" placeholder="留空则不修改" autocomplete="off"></div>
       </div>
-      <div class="section-title">📊 最近 7 天</div><div id="parent-report" class="parent-report"></div>
+      <div class="section-title">📊 本周学习报告（最近 7 天）</div>
+      <div id="weekly-summary" class="weekly-summary"></div>
+      <div id="parent-report" class="parent-report"></div>
+      <div id="weekly-mistakes" class="weekly-mistakes"></div>
+      <button class="btn btn-primary" id="weekly-save-image" style="width:100%;margin-top:10px">📷 保存报告图片</button>
+      <div id="weekly-status" class="feedback" aria-live="polite"></div>
       <div id="parent-save-status" class="feedback" aria-live="polite"></div>
       <div class="btn-group"><button class="btn btn-green" id="parent-save">保存设置</button><button class="btn btn-gray" id="parent-lock">退出家长模式</button></div>
     </div>
@@ -544,6 +578,7 @@
       <option value="mixed">综合练习</option>
       <option value="meaning">看中文选英文</option>
       <option value="listening">听音选单词</option>
+      <option value="picture">看图选单词</option>
       <option value="sentence">例句选词填空</option>
     </select>
   </div>
@@ -566,6 +601,7 @@
   <div id="voice-security-note" class="voice-note" style="display:none"></div>
   <div class="card">
     <span class="badge unit" id="voice-pos"></span>
+    <div class="word-picture" id="voice-picture" style="display:none"></div>
     <div class="word-en" id="voice-word">morning</div>
     <div class="ipa" id="voice-ipa"></div>
     <div class="cn" id="voice-cn"></div>
@@ -632,7 +668,7 @@
     <div class="reward-progress"><div id="reward-progress-bar" style="width:0"></div></div>
     <div class="reward-badges" id="reward-badges"></div>
     <div class="reward-rules">
-      <span>学新词 +5</span><span>复习正确 +3</span><span>练习正确 +2</span>
+      <span>学新词 +1</span><span>复习正确 +3</span><span>练习正确 +2</span>
       <span>默写正确 +3</span><span>发音达标 +2～7</span><span>完成今日 +10</span>
     </div>
   </div>
@@ -640,6 +676,8 @@
   <div id="reward-shop" class="reward-shop"></div>
   <div class="section-title">🧾 最近兑换</div>
   <div id="reward-history" class="card reward-history" style="padding:10px"></div>
+  <div class="section-title">📒 积分明细（最近 30 条）</div>
+  <div id="points-log" class="card reward-history points-log" style="padding:10px"></div>
   <div class="card" style="padding:14px">
     <div class="cal-head">
       <button id="cal-prev" aria-label="上个月">‹</button>
@@ -936,10 +974,29 @@ const EXAMPLES_B = {
 };
 Object.assign(EXAMPLES, EXAMPLES_B);
 
+const VISUALS = {
+  morning:'🌅', afternoon:'☀️', evening:'🌆', hello:'👋', friend:'🧒', welcome:'🎉', name:'🪪', hi:'👋',
+  pack:'🧳', my:'🙋', schoolbag:'🎒', pencil:'✏️', ruler:'📏', eraser:'🧽', book:'📘', 'pencil case':'🖍️',
+  clean:'🧹', classroom:'🏫', door:'🚪', desk:'🧑‍🏫', chair:'🪑', 'on duty':'🧹', blackboard:'⬛', floor:'🟫',
+  face:'🙂', eye:'👁️', ear:'👂', nose:'👃', mouth:'👄', family:'👨‍👩‍👧', mum:'👩', dad:'👨', brother:'👦', sister:'👧', me:'🙋',
+  warm:'🌞', happy:'😄', love:'❤️', helpful:'🤝', animal:'🐾', horse:'🐴', dog:'🐶', hen:'🐔', bee:'🐝', cat:'🐱',
+  bird:'🐦', hill:'⛰️', 'fly away':'🕊️', 'come back':'↩️', 'flap wings':'🪽', wash:'🧼', 'tie shoelaces':'👟', 'take a photo':'📷',
+  one:'1️⃣', two:'2️⃣', three:'3️⃣', four:'4️⃣', five:'5️⃣', six:'6️⃣', fine:'😊', busy:'🏃', tired:'😴', great:'🌟',
+  lunch:'🍱', time:'🕐', meatball:'🍡', rice:'🍚', vegetable:'🥬', soup:'🥣', apple:'🍎', colour:'🎨', yellow:'🟡', red:'🔴', blue:'🔵', green:'🟢',
+  playground:'🛝', slide:'🛝', swing:'🎠', seesaw:'⚖️', 'hold on tight':'✊', 'be careful':'⚠️', weather:'🌤️', sunny:'☀️', rainy:'🌧️', windy:'💨', cloudy:'☁️', snowy:'🌨️',
+  clothes:'👕', shirt:'👔', trousers:'👖', sock:'🧦', shoe:'👟', hat:'👒', skirt:'👗', dress:'👗', game:'🎮', 'hide-and-seek':'🙈', ready:'✅', play:'🧸',
+  'move-and-freeze':'🧍', 'skip rope':'🪢', 'throw sandbags':'🎯', 'traffic light':'🚦', stop:'🛑', go:'🟢', wait:'⏳', 'zebra crossing':'🚸',
+  panda:'🐼', see:'👀', 'look at':'👀', tiger:'🐯', elephant:'🐘', monkey:'🐒', 'climb a tree':'🐒', swim:'🏊', kite:'🪁', 'toy car':'🚗',
+  'toy boat':'⛵', ball:'⚽', cute:'🥰', gift:'🎁', 'toy train':'🚂'
+};
+
+function catalogNumber(value, width) { return ('0000' + value).slice(-width); }
+function catalogKey(term, unit, no) { return `${term}-${term === 'QB' ? 'T' : 'U'}${catalogNumber(unit, 2)}-${catalogNumber(no, 3)}`; }
+
 function makeWords(rows, term, startId) {
   return rows.map((r, i) => ({
-    id: startId + i, no: i + 1, term: term, unit: r[0], w: r[1], syl: r[2], ipa: r[3], cn: r[4],
-    example: EXAMPLES[r[1]][0], exampleCn: EXAMPLES[r[1]][1], starred: false
+    id: startId + i, key: catalogKey(term, r[0], i + 1), no: i + 1, term: term, unit: r[0], w: r[1], syl: r[2], ipa: r[3], cn: r[4],
+    example: EXAMPLES[r[1]][0], exampleCn: EXAMPLES[r[1]][1], starred: false, visual: VISUALS[r[1]] || ''
   }));
 }
 const DIFFICULTY_LEVELS = {
@@ -968,7 +1025,7 @@ function makeHandbookWords(startId) {
   themes.forEach(theme => theme.entries.forEach((entry, index) => {
     const difficulty = phraseDifficulty(theme.theme, entry[0]);
     words.push({
-      id: id++, no: index + 1, term: 'QB', unit: theme.theme, w: entry[0], syl: entry[0],
+      id: id++, key: catalogKey('QB', theme.theme, index + 1), no: index + 1, term: 'QB', unit: theme.theme, w: entry[0], syl: entry[0],
       ipa: difficultyText(difficulty) + ' · ' + (entry[2] ? '★ 重点必掌握' : '核心词组'), cn: entry[1], example: '', exampleCn: '',
       starred: !!entry[2], difficulty: difficulty, themeTitle: theme.title, themeTitleEn: theme.titleEn
     });
@@ -978,6 +1035,12 @@ function makeHandbookWords(startId) {
 const TEXTBOOK_WORDS = makeWords(RAW, '1A', 1).concat(makeWords(RAW_B, '1B', RAW.length + 1));
 const WORDS = TEXTBOOK_WORDS.concat(makeHandbookWords(TEXTBOOK_WORDS.length + 1));
 const BY_ID = WORDS.reduce((map, word) => { map[word.id] = word; return map; }, {});
+const BY_KEY = WORDS.reduce((map, word) => { map[word.key] = word; return map; }, {});
+function resolveWordId(value) {
+  if (typeof value === 'string' && BY_KEY[value]) return BY_KEY[value].id;
+  const numeric = Number(value);
+  return BY_ID[numeric] ? numeric : null;
+}
 
 function currentTerm() {
   if (data && data.term === '1B') return '1B';
@@ -1004,6 +1067,24 @@ const MAX_STAGE = 5;
 function maxStageFor(id) { return BY_ID[id] && BY_ID[id].term === 'QB' ? 3 : MAX_STAGE; }
 
 // ================= 存储 =================
+const STAT_FIELDS = ['learned','reviewOk','reviewBad','practiceOk','practiceBad','dictOk','dictBad','challengeOk','challengeBad'];
+const STAT_KINDS = { review: ['reviewOk','reviewBad'], practice: ['practiceOk','practiceBad'], dictation: ['dictOk','dictBad'], challenge: ['challengeOk','challengeBad'] };
+
+function recordStat(kind, right) {
+  if (!data.stats) data.stats = {};
+  const date = today();
+  if (!data.stats[date]) {
+    data.stats[date] = {};
+    STAT_FIELDS.forEach(field => { data.stats[date][field] = 0; });
+    const dates = Object.keys(data.stats).sort();
+    while (dates.length > 120) delete data.stats[dates.shift()];
+  }
+  const field = kind === 'learned' ? 'learned' : STAT_KINDS[kind] && STAT_KINDS[kind][right ? 0 : 1];
+  if (!field) return;
+  data.stats[date][field] = (data.stats[date][field] || 0) + 1;
+  save();
+}
+
 function defaultRewardShop() {
   return [
     { id: 'fruit', emoji: '🍎', name: '选择今天的水果', cost: 50 },
@@ -1015,9 +1096,9 @@ function defaultRewardShop() {
 }
 const KEY = 'word_checkin_v1';
 const defaultData = () => ({
-  version: 3, term: '1A', goal: 5, progress: {}, checkins: {}, mistakes: [], scores: {},
+  version: 4, term: '1A', goal: 5, progress: {}, checkins: {}, mistakes: [], scores: {},
   rewards: { points: 0, ledger: {}, shop: defaultRewardShop(), redemptions: [] },
-  parent: { pin: '1234', dictation: true, voice: true, dailyMinutes: 0, coreLevel: 1, reduceMotion: false }, usage: {},
+  parent: { pin: '1234', dictation: true, voice: true, dailyMinutes: 0, coreLevel: 1, reduceMotion: false, dailyPointCap: 0, redeemDailyLimit: 1 }, usage: {}, stats: {},
   studyScopes: { '1A': 'all', '1B': 'all', 'QB': 'all' }, dailies: {}, daily: null
 });
 let storageAvailable = true;
@@ -1036,9 +1117,10 @@ function sanitizeDaily(rawDaily, fallbackTerm) {
   if (!rawDaily || typeof rawDaily !== 'object') return null;
   const term = validTerm(rawDaily.term) ? rawDaily.term : fallbackTerm;
   const queue = Array.isArray(rawDaily.queue) ? rawDaily.queue.filter(item => {
-    const word = item && BY_ID[Number(item.id)];
+    const id = item && resolveWordId(item.id);
+    const word = id && BY_ID[id];
     return word && word.term === term && (item.type === 'new' || item.type === 'review');
-  }).map(item => ({ id: Number(item.id), type: item.type })) : [];
+  }).map(item => ({ id: resolveWordId(item.id), type: item.type })) : [];
   return {
     term: term,
     date: validDate(rawDaily.date) ? rawDaily.date : '',
@@ -1048,6 +1130,16 @@ function sanitizeDaily(rawDaily, fallbackTerm) {
     pos: Math.max(0, Math.min(Number(rawDaily.pos) || 0, queue.length))
   };
 }
+function migrateRewardLedgerKey(key) {
+  const parts = String(key).split(':');
+  const firstIdActions = ['learn','review','pronunciation'];
+  const datedIdActions = ['practice','dictation','mistake-challenge'];
+  const index = firstIdActions.includes(parts[0]) ? 1 : datedIdActions.includes(parts[0]) ? 2 : -1;
+  if (index < 0 || !parts[index]) return String(key);
+  const id = resolveWordId(parts[index]);
+  if (id) parts[index] = BY_ID[id].key;
+  return parts.join(':');
+}
 function normalizeStoredData(raw) {
   const clean = defaultData();
   if (!raw || typeof raw !== 'object') return clean;
@@ -1055,7 +1147,7 @@ function normalizeStoredData(raw) {
   clean.goal = Math.max(1, Math.min(50, Number(raw.goal) || 5));
 
   if (raw.progress && typeof raw.progress === 'object') Object.keys(raw.progress).forEach(key => {
-    const id = Number(key), item = raw.progress[key];
+    const id = resolveWordId(key), item = raw.progress[key];
     if (!BY_ID[id] || !item || typeof item !== 'object') return;
     const stage = Math.max(0, Math.min(maxStageFor(id), Number(item.stage) || 0));
     if (stage) clean.progress[id] = { stage: stage, next: validDate(item.next) ? item.next : null };
@@ -1063,9 +1155,9 @@ function normalizeStoredData(raw) {
   if (raw.checkins && typeof raw.checkins === 'object') Object.keys(raw.checkins).forEach(date => {
     if (validDate(date) && raw.checkins[date]) clean.checkins[date] = true;
   });
-  if (Array.isArray(raw.mistakes)) clean.mistakes = [...new Set(raw.mistakes.map(Number).filter(id => BY_ID[id]))];
+  if (Array.isArray(raw.mistakes)) clean.mistakes = [...new Set(raw.mistakes.map(resolveWordId).filter(id => id && BY_ID[id]))];
   if (raw.scores && typeof raw.scores === 'object') Object.keys(raw.scores).forEach(key => {
-    const id = Number(key), item = raw.scores[key];
+    const id = resolveWordId(key), item = raw.scores[key];
     if (!BY_ID[id] || !item || typeof item !== 'object') return;
     clean.scores[id] = {
       best: Math.max(0, Math.min(100, Number(item.best) || 0)),
@@ -1083,10 +1175,11 @@ function normalizeStoredData(raw) {
       const rawPoints = Math.floor(Number(item.points) || 0);
       if (rawPoints === 0) return;
       const points = Math.max(-1000, Math.min(1000, rawPoints));
-      clean.rewards.ledger[String(key).slice(0, 180)] = {
+      clean.rewards.ledger[migrateRewardLedgerKey(String(key).slice(0, 180))] = {
         points: points,
         reason: typeof item.reason === 'string' ? item.reason.slice(0, 80) : '',
-        date: validDate(item.date) ? item.date : ''
+        date: validDate(item.date) ? item.date : '',
+        at: Number.isFinite(Number(item.at)) && Number(item.at) > 0 ? Math.floor(Number(item.at)) : 0
       };
     });
     if (Array.isArray(raw.rewards.shop)) clean.rewards.shop = raw.rewards.shop.slice(0, 30).map((item, index) => ({
@@ -1110,7 +1203,17 @@ function normalizeStoredData(raw) {
     clean.parent.dailyMinutes = Math.max(0, Math.min(180, Math.floor(Number(raw.parent.dailyMinutes) || 0)));
     clean.parent.coreLevel = Math.max(1, Math.min(4, Math.floor(Number(raw.parent.coreLevel) || 1)));
     clean.parent.reduceMotion = raw.parent.reduceMotion === true;
+    clean.parent.dailyPointCap = Math.max(0, Math.min(1000, Math.floor(Number(raw.parent.dailyPointCap) || 0)));
+    clean.parent.redeemDailyLimit = raw.parent.redeemDailyLimit === undefined ? 1 :
+      Math.max(0, Math.min(20, Math.floor(Number(raw.parent.redeemDailyLimit) || 0)));
   }
+  if (raw.stats && typeof raw.stats === 'object') Object.keys(raw.stats).filter(validDate).sort().slice(-120).forEach(date => {
+    const item = raw.stats[date];
+    if (!item || typeof item !== 'object') return;
+    const day = {};
+    STAT_FIELDS.forEach(field => { day[field] = Math.max(0, Math.min(100000, Math.floor(Number(item[field]) || 0))); });
+    clean.stats[date] = day;
+  });
   if (raw.usage && typeof raw.usage === 'object') Object.keys(raw.usage).forEach(date => {
     if (validDate(date)) clean.usage[date] = Math.max(0, Math.min(86400, Math.floor(Number(raw.usage[date]) || 0)));
   });
@@ -1129,6 +1232,26 @@ function normalizeStoredData(raw) {
   return clean;
 }
 
+function serializeDaily(daily) {
+  if (!daily) return null;
+  return Object.assign({}, daily, {
+    queue: (daily.queue || []).map(item => ({ id: BY_ID[item.id] ? BY_ID[item.id].key : item.id, type: item.type }))
+  });
+}
+function serializeStoredData(runtime) {
+  const output = JSON.parse(JSON.stringify(runtime));
+  output.version = 4;
+  output.progress = {};
+  Object.keys(runtime.progress || {}).forEach(id => { if (BY_ID[id]) output.progress[BY_ID[id].key] = runtime.progress[id]; });
+  output.mistakes = (runtime.mistakes || []).map(id => BY_ID[id] ? BY_ID[id].key : id);
+  output.scores = {};
+  Object.keys(runtime.scores || {}).forEach(id => { if (BY_ID[id]) output.scores[BY_ID[id].key] = runtime.scores[id]; });
+  output.dailies = {};
+  Object.keys(runtime.dailies || {}).forEach(term => { output.dailies[term] = serializeDaily(runtime.dailies[term]); });
+  output.daily = serializeDaily(runtime.daily);
+  return output;
+}
+
 function load() {
   let stored;
   try { stored = localStorage.getItem(KEY); }
@@ -1142,14 +1265,14 @@ function load() {
 }
 function save() {
   if (!storageAvailable) return;
-  try { localStorage.setItem(KEY, JSON.stringify(data)); }
+  try { localStorage.setItem(KEY, JSON.stringify(serializeStoredData(data))); }
   catch (error) { storageAvailable = false; }
 }
 
 function backupPayload() {
   return {
     format: 'word-checkin-backup', version: 1, exportedAt: new Date().toISOString(),
-    catalog: 'textbooks-123_handbook-1000_v1', data: normalizeStoredData(data)
+    catalog: 'stable-keys-v1_textbooks-123_handbook-1000', data: serializeStoredData(data)
   };
 }
 function exportProgress() {
@@ -1237,20 +1360,62 @@ function updateOfflineBadge() {
   document.getElementById('offline-badge').classList.toggle('show', navigator.onLine === false);
 }
 
+let waitingWorker = null;
+let updateRequested = false;
+
+function showUpdateBanner(worker) {
+  if (!worker) return;
+  waitingWorker = worker;
+  const nowButton = document.getElementById('update-now');
+  nowButton.disabled = false;
+  nowButton.textContent = '立即更新';
+  document.getElementById('update-banner').classList.add('show');
+}
+
+function hideUpdateBanner() {
+  document.getElementById('update-banner').classList.remove('show');
+}
+
+function applyUpdateNow() {
+  if (!waitingWorker) { location.reload(); return; }
+  updateRequested = true;
+  const nowButton = document.getElementById('update-now');
+  nowButton.disabled = true;
+  nowButton.textContent = '正在更新…';
+  try { save(); } catch (error) { /* 数据已在每次操作时保存 */ }
+  waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+  // 兜底：个别旧版 Safari 不触发 controllerchange 时也能刷新
+  setTimeout(() => location.reload(), 4000);
+}
+
+function watchInstallingWorker(registration) {
+  const worker = registration.installing;
+  if (!worker) return;
+  worker.addEventListener('statechange', () => {
+    if (worker.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner(registration.waiting || worker);
+  });
+}
+
 function registerPWA() {
   updateInstallButton();
   updateOfflineBadge();
+  document.getElementById('update-now').addEventListener('click', applyUpdateNow);
+  document.getElementById('update-later').addEventListener('click', hideUpdateBanner);
   if (!('serviceWorker' in navigator) || (location.protocol !== 'https:' && location.hostname !== 'localhost')) return;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // 首次安装时 clients.claim() 也会触发，只有用户点了"立即更新"才刷新
+    if (!updateRequested) return;
+    updateRequested = false;
+    location.reload();
+  });
   navigator.serviceWorker.register('./sw.js').then(registration => {
-    registration.addEventListener('updatefound', () => {
-      const worker = registration.installing;
-      if (!worker) return;
-      worker.addEventListener('statechange', () => {
-        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-          document.getElementById('install-status').className = 'feedback ok';
-          document.getElementById('install-status').textContent = '发现新版本，下次打开将自动更新。';
-        }
-      });
+    if (registration.waiting && navigator.serviceWorker.controller) showUpdateBanner(registration.waiting);
+    registration.addEventListener('updatefound', () => watchInstallingWorker(registration));
+    // 主屏幕 App 可能长时间不关闭：切回前台时检查一次新版本
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && navigator.onLine !== false) {
+        registration.update().catch(() => {});
+      }
     });
   }).catch(() => {
     document.getElementById('install-status').className = 'feedback bad';
@@ -1276,7 +1441,7 @@ let parentUnlocked = false;
 let parentUnlockTimer = null;
 
 function parentSettings() {
-  if (!data.parent) data.parent = { pin: '1234', dictation: true, voice: true, dailyMinutes: 0, coreLevel: 1, reduceMotion: false };
+  if (!data.parent) data.parent = { pin: '1234', dictation: true, voice: true, dailyMinutes: 0, coreLevel: 1, reduceMotion: false, dailyPointCap: 0, redeemDailyLimit: 1 };
   return data.parent;
 }
 
@@ -1329,19 +1494,166 @@ function fillParentScopeOptions() {
   sel.value = Array.prototype.some.call(sel.options, option => option.value === selected) ? selected : 'all';
 }
 
+function accuracyText(ok, bad) {
+  const total = ok + bad;
+  return total ? `${Math.round(ok / total * 100)}%（${ok}/${total}）` : '—';
+}
+
+function weeklyReport() {
+  const days = [];
+  for (let offset = 6; offset >= 0; offset--) days.push(addDays(today(), -offset));
+  const totals = {};
+  STAT_FIELDS.forEach(field => { totals[field] = 0; });
+  let seconds = 0, earned = 0, spent = 0;
+  const ledger = Object.values(rewardData().ledger);
+  const dayRows = days.map(date => {
+    const stat = data.stats && data.stats[date] || {};
+    STAT_FIELDS.forEach(field => { totals[field] += stat[field] || 0; });
+    const used = data.usage && data.usage[date] || 0;
+    seconds += used;
+    let dayPoints = 0;
+    ledger.filter(item => item.date === date).forEach(item => {
+      dayPoints += item.points;
+      if (item.points > 0) earned += item.points; else spent -= item.points;
+    });
+    return { date: date, done: !!data.checkins[date], minutes: Math.floor(used / 60), points: dayPoints };
+  });
+  const weekScores = Object.values(data.scores || {}).filter(item => item.date && item.date >= days[0]);
+  const avgScore = weekScores.length ? Math.round(weekScores.reduce((sum, item) => sum + (item.last || 0), 0) / weekScores.length) : null;
+  const mastered = WORDS.filter(x => prog(x.id).stage >= maxStageFor(x.id)).length;
+  return {
+    start: days[0], end: days[6], days: dayRows,
+    checkinDays: dayRows.filter(day => day.done).length,
+    minutes: Math.floor(seconds / 60), learned: totals.learned,
+    review: accuracyText(totals.reviewOk, totals.reviewBad),
+    practice: accuracyText(totals.practiceOk, totals.practiceBad),
+    dictation: accuracyText(totals.dictOk, totals.dictBad),
+    challenge: accuracyText(totals.challengeOk, totals.challengeBad),
+    avgScore: avgScore, scoredWords: weekScores.length,
+    earned: earned, spent: spent, mastered: mastered,
+    mistakes: data.mistakes.map(id => BY_ID[id]).filter(Boolean)
+  };
+}
+
 function renderParentReport() {
+  const report = weeklyReport();
+  const summary = document.getElementById('weekly-summary');
+  summary.innerHTML = '';
+  [
+    ['📅 打卡天数', `${report.checkinDays}/7 天`],
+    ['⏱️ 使用时间', `${report.minutes} 分钟`],
+    ['🌱 新学内容', `${report.learned} 个`],
+    ['🏅 累计掌握', `${report.mastered} 个`],
+    ['🔁 复习正确率', report.review],
+    ['🎮 练习正确率', report.practice],
+    ['✏️ 默写正确率', report.dictation],
+    ['🔥 闯关正确率', report.challenge],
+    ['🎤 平均发音分', report.avgScore == null ? '—' : `${report.avgScore} 分（${report.scoredWords} 词）`],
+    ['⭐ 积分', `获得 ${report.earned} · 兑换 ${report.spent}`]
+  ].forEach(item => summary.append(el('div', { class: 'weekly-item' }, [el('span', { text: item[0] }), el('b', { text: item[1] })])));
+
   const root = document.getElementById('parent-report');
   root.innerHTML = '';
-  for (let offset = 6; offset >= 0; offset--) {
-    const date = addDays(today(), -offset);
-    const dayPoints = Object.values(rewardData().ledger).filter(item => item.date === date).reduce((sum, item) => sum + item.points, 0);
-    const minutes = Math.floor((data.usage && data.usage[date] || 0) / 60);
-    root.append(el('div', { class: 'report-day' + (data.checkins[date] ? ' done' : '') }, [
-      el('span', { text: date.slice(5) }),
-      el('b', { text: data.checkins[date] ? '✅' : '—' }),
-      el('span', { text: `⭐${dayPoints} · ${minutes}分` })
-    ]));
+  report.days.forEach(day => root.append(el('div', { class: 'report-day' + (day.done ? ' done' : '') }, [
+    el('span', { text: day.date.slice(5) }),
+    el('b', { text: day.done ? '✅' : '—' }),
+    el('span', { text: `⭐${day.points} · ${day.minutes}分` })
+  ])));
+
+  const mistakesRoot = document.getElementById('weekly-mistakes');
+  mistakesRoot.innerHTML = '';
+  mistakesRoot.append(el('div', { class: 'hint', text: report.mistakes.length ? `需要加强（错题 ${report.mistakes.length} 个）：` : '目前没有错题，继续保持！' }));
+  report.mistakes.slice(0, 12).forEach(x => mistakesRoot.append(el('span', { class: 'weekly-chip', text: `${x.w} ${x.cn}` })));
+}
+
+function saveWeeklyReportImage() {
+  const status = document.getElementById('weekly-status');
+  const report = weeklyReport();
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx || !canvas.toBlob) {
+    status.className = 'feedback bad';
+    status.textContent = '当前浏览器不支持生成图片。';
+    return;
   }
+  const width = 1080, height = 1500;
+  canvas.width = width; canvas.height = height;
+  const bg = ctx.createLinearGradient(0, 0, width, height);
+  bg.addColorStop(0, '#e6f6ff'); bg.addColorStop(.55, '#f4efff'); bg.addColorStop(1, '#fff6dc');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+  const font = '"PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(50, 50, width - 100, height - 100, 40) : ctx.rect(50, 50, width - 100, height - 100); ctx.fill();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#17479f'; ctx.font = `bold 64px ${font}`;
+  ctx.fillText('📒 单词打卡 · 周学习报告', width / 2, 160);
+  ctx.fillStyle = '#667895'; ctx.font = `34px ${font}`;
+  ctx.fillText(`${report.start} 至 ${report.end}`, width / 2, 220);
+
+  const items = [
+    ['📅 打卡天数', `${report.checkinDays}/7 天`], ['⏱️ 使用时间', `${report.minutes} 分钟`],
+    ['🌱 新学内容', `${report.learned} 个`], ['🏅 累计掌握', `${report.mastered} 个`],
+    ['🔁 复习正确率', report.review], ['🎮 练习正确率', report.practice],
+    ['✏️ 默写正确率', report.dictation], ['🔥 闯关正确率', report.challenge],
+    ['🎤 平均发音分', report.avgScore == null ? '—' : `${report.avgScore} 分`], ['⭐ 获得积分', `${report.earned}`]
+  ];
+  items.forEach((item, index) => {
+    const col = index % 2, row = Math.floor(index / 2);
+    const x = 100 + col * 450, y = 290 + row * 150;
+    ctx.fillStyle = ['#eef6ff','#fff5dc','#eafbf4','#f4edff'][index % 4];
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, 430, 125, 24) : ctx.rect(x, y, 430, 125); ctx.fill();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#566b8f'; ctx.font = `30px ${font}`; ctx.fillText(item[0], x + 28, y + 48);
+    ctx.fillStyle = '#17479f'; ctx.font = `bold 38px ${font}`; ctx.fillText(item[1], x + 28, y + 100);
+  });
+
+  const dayY = 1060;
+  report.days.forEach((day, index) => {
+    const x = 100 + index * 125;
+    ctx.fillStyle = day.done ? '#dcf8eb' : '#eef2f8';
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, dayY, 110, 120, 20) : ctx.rect(x, dayY, 110, 120); ctx.fill();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#566b8f'; ctx.font = `24px ${font}`; ctx.fillText(day.date.slice(5), x + 55, dayY + 38);
+    ctx.font = `40px ${font}`; ctx.fillText(day.done ? '✅' : '—', x + 55, dayY + 92);
+  });
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#263f69'; ctx.font = `bold 32px ${font}`;
+  ctx.fillText(report.mistakes.length ? `需要加强：错题本中有 ${report.mistakes.length} 个` : '目前错题本是空的，太棒了！', 100, 1250);
+  ctx.fillStyle = '#566b8f'; ctx.font = `28px ${font}`;
+  const words = report.mistakes.slice(0, 8).map(x => x.w).join('、');
+  if (words) ctx.fillText(words.length > 46 ? words.slice(0, 46) + '…' : words, 100, 1300);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#9aa8bf'; ctx.font = `26px ${font}`;
+  ctx.fillText('坚持每天学习一点点，进步看得见！', width / 2, 1395);
+
+  canvas.toBlob(async blob => {
+    if (!blob) {
+      status.className = 'feedback bad';
+      status.textContent = '生成图片失败，请重试。';
+      return;
+    }
+    const fileName = `周学习报告-${report.end}.png`;
+    try {
+      if (window.File && navigator.canShare) {
+        const file = new File([blob], fileName, { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: '单词打卡周报告' });
+          status.className = 'feedback ok';
+          status.textContent = '✅ 报告已分享。';
+          return;
+        }
+      }
+    } catch (error) {
+      if (error && error.name === 'AbortError') return;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = fileName;
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    status.className = 'feedback ok';
+    status.textContent = '✅ 报告图片已生成；iPad 上可长按图片保存到相册。';
+  }, 'image/png');
 }
 
 function showParentPanel() {
@@ -1353,6 +1665,8 @@ function showParentPanel() {
   document.getElementById('parent-dictation').checked = settings.dictation;
   document.getElementById('parent-voice').checked = settings.voice;
   document.getElementById('parent-reduce-motion').checked = settings.reduceMotion === true;
+  document.getElementById('parent-point-cap').value = settings.dailyPointCap || 0;
+  document.getElementById('parent-redeem-limit').value = settings.redeemDailyLimit === undefined ? 1 : settings.redeemDailyLimit;
   document.getElementById('parent-core-level').value = settings.coreLevel || 1;
   document.getElementById('parent-term').value = currentTerm();
   document.getElementById('parent-new-pin').value = '';
@@ -1400,6 +1714,8 @@ function saveParentSettings() {
   settings.dictation = document.getElementById('parent-dictation').checked;
   settings.voice = document.getElementById('parent-voice').checked;
   settings.reduceMotion = document.getElementById('parent-reduce-motion').checked;
+  settings.dailyPointCap = Math.max(0, Math.min(1000, Math.floor(Number(document.getElementById('parent-point-cap').value) || 0)));
+  settings.redeemDailyLimit = Math.max(0, Math.min(20, Math.floor(Number(document.getElementById('parent-redeem-limit').value) || 0)));
   const oldCoreLevel = settings.coreLevel || 1;
   settings.coreLevel = Math.max(1, Math.min(4, Number(document.getElementById('parent-core-level').value) || 1));
   if (newPin) settings.pin = newPin;
@@ -1407,7 +1723,7 @@ function saveParentSettings() {
   if (adjustment) {
     const rewards = rewardData();
     rewards.points = Math.max(0, rewards.points + adjustment);
-    rewards.ledger[`parent:${Date.now()}`] = { points: adjustment, reason: adjustment > 0 ? '家长奖励' : '兑换奖励', date: today() };
+    rewards.ledger[`parent:${Date.now()}`] = { points: adjustment, reason: adjustment > 0 ? '家长奖励' : '家长扣除', date: today(), at: Date.now() };
     document.getElementById('parent-points-adjust').value = '0';
   }
   const term = document.getElementById('parent-term').value;
@@ -1555,15 +1871,89 @@ function showCompletionCelebration(title, subtitle, emoji) {
   celebrationTimer = setTimeout(closeCelebration, parentSettings().reduceMotion || systemReduced ? 1800 : 2800);
 }
 
+// 今天通过学习获得的积分（不含家长奖励和兑换）
+function todayEarnedPoints() {
+  const date = today();
+  return Object.keys(rewardData().ledger).reduce((sum, key) => {
+    const item = rewardData().ledger[key];
+    return item.date === date && item.points > 0 && key.indexOf('parent:') !== 0 ? sum + item.points : sum;
+  }, 0);
+}
+
+let capToastDate = '';
+// 返回实际发放的积分；0 表示未发放（已领取过或已达今日上限）
 function awardPoints(key, points, reason) {
   const rewards = rewardData();
-  if (rewards.ledger[key]) return false;
-  rewards.ledger[key] = { points: points, reason: reason, date: today() };
-  rewards.points += points;
+  if (rewards.ledger[key]) return 0;
+  let granted = points;
+  const cap = parentSettings().dailyPointCap || 0;
+  if (cap > 0 && points > 0) {
+    const remaining = cap - todayEarnedPoints();
+    if (remaining <= 0) {
+      if (capToastDate !== today()) {
+        capToastDate = today();
+        const toast = document.getElementById('reward-toast');
+        toast.textContent = '🌙 今天的积分已满，明天继续加油！';
+        toast.classList.add('show');
+        if (rewardToastTimer) clearTimeout(rewardToastTimer);
+        rewardToastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+      }
+      return 0;
+    }
+    granted = Math.min(points, remaining);
+  }
+  rewards.ledger[key] = { points: granted, reason: reason, date: today(), at: Date.now() };
+  rewards.points += granted;
   save();
   renderHeader();
-  showRewardToast(points, reason);
-  return true;
+  showRewardToast(granted, reason + (granted < points ? '（今日积分已满）' : ''));
+  return granted;
+}
+
+function ledgerWord(key) {
+  const parts = String(key).split(':');
+  for (let i = 0; i < parts.length; i++) if (BY_KEY[parts[i]]) return BY_KEY[parts[i]].w;
+  return '';
+}
+
+function ledgerTimeText(item) {
+  if (item.at) {
+    const d = new Date(item.at);
+    return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
+  return item.date ? item.date.slice(5) : '';
+}
+
+function renderPointsLog() {
+  const root = document.getElementById('points-log');
+  root.innerHTML = '';
+  const ledger = rewardData().ledger;
+  const entries = Object.keys(ledger).map(key => Object.assign({ key: key }, ledger[key]))
+    .sort((a, b) => (b.at || 0) - (a.at || 0) || String(b.date).localeCompare(String(a.date)))
+    .slice(0, 30);
+  const cap = parentSettings().dailyPointCap || 0;
+  root.append(el('div', { class: 'hint', style: 'margin:0 4px 6px', text: `今天学习获得 ⭐ ${todayEarnedPoints()}` + (cap ? ` / 上限 ${cap}` : '') }));
+  if (!entries.length) {
+    root.append(el('div', { class: 'empty', text: '还没有积分记录，学会第一个单词就能得到星星！' }));
+    return;
+  }
+  entries.forEach(item => {
+    const word = ledgerWord(item.key);
+    root.append(el('div', { class: 'reward-history-row' }, [
+      el('span', { text: `${ledgerTimeText(item)}　${item.reason || '积分变化'}${word ? ' · ' + word : ''}` }),
+      el('b', { class: item.points >= 0 ? 'ok' : 'bad', text: `${item.points >= 0 ? '+' : ''}${item.points}` })
+    ]));
+  });
+}
+
+function todayRedeemCount(id) {
+  const date = today();
+  return rewardData().redemptions.filter(item => item.id === id && item.date === date).length;
+}
+
+function redeemLimitReached(id) {
+  const limit = parentSettings().redeemDailyLimit || 0;
+  return limit > 0 && todayRedeemCount(id) >= limit;
 }
 
 function renderRewards() {
@@ -1594,13 +1984,15 @@ function renderRewardShop() {
   shop.innerHTML = '';
   if (!rewards.shop.length) shop.append(el('div', { class: 'empty', text: '家长暂时没有设置可兑换奖励。' }));
   rewards.shop.forEach(item => {
+    const limited = redeemLimitReached(item.id);
     const affordable = rewards.points >= item.cost;
+    const available = affordable && !limited;
     const redeemButton = el('button', {
-      class: 'btn ' + (affordable ? 'btn-primary' : 'btn-gray'),
-      text: affordable ? '🎁 申请兑换' : `还差 ${item.cost - rewards.points} 分`,
+      class: 'btn ' + (available ? 'btn-primary' : 'btn-gray'),
+      text: limited ? '✅ 今天已兑换，明天再来' : affordable ? '🎁 申请兑换' : `还差 ${item.cost - rewards.points} 分`,
       onclick: () => openRedeemModal(item.id)
     });
-    redeemButton.disabled = !affordable;
+    redeemButton.disabled = !available;
     shop.append(el('div', { class: 'reward-item' }, [
       el('div', { class: 'reward-item-head' }, [
         el('span', { class: 'reward-emoji', text: item.emoji }),
@@ -1617,11 +2009,12 @@ function renderRewardShop() {
     el('span', { text: `${item.emoji} ${item.name}` }),
     el('span', { text: `⭐ -${item.cost}　${item.date}` })
   ])));
+  renderPointsLog();
 }
 
 function openRedeemModal(id) {
   const item = rewardData().shop.find(reward => reward.id === id);
-  if (!item || rewardData().points < item.cost) return;
+  if (!item || rewardData().points < item.cost || redeemLimitReached(id)) return;
   pendingRewardId = id;
   const summary = document.getElementById('redeem-summary');
   summary.innerHTML = '';
@@ -1655,8 +2048,12 @@ function confirmRedeem() {
     document.getElementById('redeem-error').textContent = '积分不足，暂时不能兑换。';
     return;
   }
+  if (redeemLimitReached(item.id)) {
+    document.getElementById('redeem-error').textContent = '这个奖励今天已经兑换过了，明天再来吧。';
+    return;
+  }
   rewards.points -= item.cost;
-  rewards.ledger[`redeem:${Date.now()}:${item.id}`] = { points: -item.cost, reason: '兑换：' + item.name, date: today() };
+  rewards.ledger[`redeem:${Date.now()}:${item.id}`] = { points: -item.cost, reason: '兑换：' + item.name, date: today(), at: Date.now() };
   rewards.redemptions.push({ id: item.id, emoji: item.emoji, name: item.name, cost: item.cost, date: today() });
   if (rewards.redemptions.length > 100) rewards.redemptions = rewards.redemptions.slice(-100);
   save();
@@ -1823,15 +2220,17 @@ function addMoreNew() {
 
 function finishItem() {
   data.daily.pos++;
-  let completedNow = false;
-  if (data.daily.pos >= data.daily.queue.length) {
+  let completedNow = false, dailyPoints = 0;
+  if (data.daily.pos === data.daily.queue.length) {
     data.checkins[today()] = true;
-    completedNow = awardPoints(`daily:${currentTerm()}:${today()}`, 10, '完成今日任务');
+    completedNow = true;
+    dailyPoints = awardPoints(`daily:${currentTerm()}:${today()}`, 10, '完成今日任务');
   }
   save();
   renderHeader();
   renderToday();
-  if (completedNow) setTimeout(() => showCompletionCelebration('今日任务完成！', '太棒了，获得 ⭐ 10 积分！明天继续加油。', '🏆'), 120);
+  if (completedNow) setTimeout(() => showCompletionCelebration('今日任务完成！',
+    dailyPoints ? `太棒了，获得 ⭐ ${dailyPoints} 积分！明天继续加油。` : '太棒了！今天的任务全部完成，明天继续加油。', '🏆'), 120);
 }
 
 // ================= 渲染辅助 =================
@@ -1936,7 +2335,8 @@ function renderToday() {
 function completeNewWord(x) {
   const firstLearn = prog(x.id).stage === 0;
   setStage(x.id, 1);
-  if (firstLearn) awardPoints(`learn:${x.id}`, 5, '学会新内容');
+  if (firstLearn) recordStat('learned');
+  if (firstLearn) awardPoints(`learn:${x.key}`, 1, '学会新内容');
   finishItem();
 }
 
@@ -1945,6 +2345,7 @@ function renderLearnCard(body, x) {
   body.append(el('div', { class: 'card' }, [
     el('span', { class: 'badge new', text: '🌱 新词' }),
     el('span', { class: 'badge unit', text: unitText(x.unit, x.term) }),
+    x.visual ? el('div', { class: 'word-picture', role: 'img', 'aria-label': x.cn, text: x.visual }) : null,
     el('div', { class: 'word-en', text: x.w }),
     el('div', { class: 'ipa', text: x.ipa }),
     el('div', { class: 'cn', text: x.cn }),
@@ -1953,14 +2354,82 @@ function renderLearnCard(body, x) {
     el('div', {}, boxesNode(x.id, false))
   ]));
   body.append(el('div', { class: 'btn-group' }, [
-    el('button', { class: 'btn btn-green', text: '🌟 我学会啦　+5', onclick: () => completeNewWord(x) })
+    el('button', { class: 'btn btn-green', text: '🌟 我学会啦　+1', onclick: () => completeNewWord(x) })
   ]));
   speak(x.w);
 }
 
-// 复习：看中文默写，对了打下一格
+// 引导式复习：第1次听音选择，第2次看中文选择
+function reviewChoiceOptions(target) {
+  const sameUnit = activeWords().filter(x => x.id !== target.id && x.unit === target.unit && normalize(x.w) !== normalize(target.w));
+  const options = shuffle(sameUnit).slice(0, 3);
+  if (options.length < 3) {
+    const used = new Set(options.map(x => x.id).concat([target.id]));
+    shuffle(activeWords().filter(x => !used.has(x.id) && normalize(x.w) !== normalize(target.w))).slice(0, 3 - options.length).forEach(x => options.push(x));
+  }
+  return shuffle([target, ...options]);
+}
+
+function renderGuidedReviewCard(body, x, st) {
+  const listening = st === 1;
+  const feedback = el('div', { class: 'feedback', 'aria-live': 'polite' });
+  const actions = el('div', { class: 'btn-group' });
+  const options = el('div', { class: 'quiz-options' });
+  let answered = false;
+
+  reviewChoiceOptions(x).forEach(option => options.append(el('button', {
+    class: 'quiz-option', 'data-option-id': option.id, text: option.w,
+    onclick: () => {
+      if (answered) return;
+      answered = true;
+      const right = option.id === x.id;
+      recordStat('review', right);
+      options.querySelectorAll('.quiz-option').forEach(button => {
+        button.disabled = true;
+        const id = Number(button.getAttribute('data-option-id'));
+        if (id === x.id) button.classList.add('correct-answer');
+        else if (id === option.id) button.classList.add('wrong-answer');
+      });
+      if (right) {
+        const nextStage = Math.min(maxStageFor(x.id), st + 1);
+        setStage(x.id, nextStage);
+        const rewarded = awardPoints(`review:${x.key}:${nextStage}`, 3, '复习正确');
+        feedback.className = 'feedback ok';
+        feedback.textContent = '✅ 答对了！' + (rewarded ? `　⭐ +${rewarded}` : '');
+      } else {
+        data.progress[x.id] = { stage: st, next: addDays(today(), 1) };
+        addMistake(x.id);
+        save();
+        feedback.className = 'feedback bad';
+        feedback.textContent = `❌ 正确答案：${x.w}`;
+      }
+      speak(x.w);
+      actions.append(el('button', { class: 'btn btn-primary', text: '下一个 ➡️', onclick: finishItem }));
+    }
+  })));
+
+  const prompt = listening ?
+    el('button', { class: 'btn-icon', style: 'font-size:62px', 'aria-label': '播放复习发音', text: '🔊', onclick: () => speak(x.w) }) :
+    el('div', { class: 'cn', style: 'font-size:30px;margin:22px 0 10px', text: x.cn });
+  body.append(el('div', { class: 'card' }, [
+    el('span', { class: 'badge review', text: listening ? '🔊 听音复习' : '👀 看义复习' }),
+    el('span', { class: 'badge unit', text: unitText(x.unit, x.term) }),
+    prompt,
+    el('div', { class: 'hint', text: listening ? '听发音，选择正确的英文' : '看中文，选择正确的英文' }),
+    options,
+    feedback,
+    el('div', {}, boxesNode(x.id, false))
+  ]), actions);
+  if (listening) speak(x.w);
+}
+
+// 后期复习：提示拼写，再进入独立默写
 function renderReviewCard(body, x) {
   const st = prog(x.id).stage;
+  if (st <= 2) {
+    renderGuidedReviewCard(body, x, st);
+    return;
+  }
   const input = el('input', { type: 'text', placeholder: '', autocomplete: 'off', autocorrect: 'off', autocapitalize: 'none', spellcheck: 'false', inputmode: 'text', 'aria-label': '默写英文输入' });
   const fb = el('div', { class: 'feedback', 'aria-live': 'polite' });
   const reveal = el('div');
@@ -1973,14 +2442,15 @@ function renderReviewCard(body, x) {
     answered = true;
     input.disabled = true;
     const right = normalize(input.value) === normalize(x.w);
+    recordStat('review', right);
     reveal.append(sylNode(x.syl), el('div', { class: 'ipa', text: x.ipa }), exampleNode(x));
     if (right) {
       const nextStage = Math.min(maxStageFor(x.id), st + 1);
       setStage(x.id, nextStage);
-      const reviewRewarded = awardPoints(`review:${x.id}:${nextStage}`, 3, '复习正确');
+      const reviewRewarded = awardPoints(`review:${x.key}:${nextStage}`, 3, '复习正确');
       fb.className = 'feedback ok';
       const reviewMessage = st + 1 >= maxStageFor(x.id) ? '✅ 正确！这个词已掌握 🏅' : `✅ 正确！打卡第 ${st + 1} 格`;
-      fb.textContent = reviewMessage + (reviewRewarded ? '　⭐ +3' : '');
+      fb.textContent = reviewMessage + (reviewRewarded ? `　⭐ +${reviewRewarded}` : '');
       input.style.borderColor = 'var(--green)';
     } else {
       // 不进格，明天再复习
@@ -2002,11 +2472,14 @@ function renderReviewCard(body, x) {
     el('button', { class: 'btn btn-gray', text: '想不起来', onclick: () => { input.value = '?'; submit(); } })
   );
 
+  const spellingHint = x.w.split(/\s+/).map(word => word.charAt(0) + '…').join(' ');
   body.append(el('div', { class: 'card' }, [
-    el('span', { class: 'badge review', text: '🔁 复习' }),
+    el('span', { class: 'badge review', text: st === 3 ? '✍️ 提示拼写' : '📝 独立默写' }),
     el('span', { class: 'badge unit', text: unitText(x.unit, x.term) }),
     el('div', { class: 'cn', style: 'font-size:26px;margin-top:22px', text: x.cn }),
-    el('button', { class: 'btn-icon', 'aria-label': '听发音', text: '🔊', onclick: () => speak(x.w) }),
+    st === 3 ? el('div', { class: 'hint', style: 'font-size:20px;font-weight:800;margin:8px', text: '首字母提示：' + spellingHint }) :
+      el('div', { class: 'hint', text: '不看提示，独立写出英文' }),
+    st === 3 ? el('button', { class: 'btn-icon', 'aria-label': '听发音', text: '🔊', onclick: () => speak(x.w) }) : null,
     reveal,
     el('div', {}, boxesNode(x.id, false))
   ]), input, fb, btns);
@@ -2104,7 +2577,7 @@ function renderList() {
         el('span', { class: 'wl-no', text: x.no }),
         el('div', { class: 'wl-main', role: 'button', tabindex: '0', 'aria-label': '朗读 ' + x.w,
                     onclick: () => speak(x.w), onkeydown: e => { if (e.key === 'Enter') speak(x.w); } }, [
-          el('div', { class: 'w', text: (x.starred ? '★ ' : '') + x.w }),
+          el('div', { class: 'w', text: (x.visual ? x.visual + ' ' : '') + (x.starred ? '★ ' : '') + x.w }),
           el('div', { class: 'm', text: `${x.ipa}  ${x.cn}` }),
           x.example ? el('div', { class: 'm', text: `${x.example}  ${x.exampleCn}` }) : null
         ]),
@@ -2116,7 +2589,7 @@ function renderList() {
 
 // ================= 互动练习 =================
 const practice = { questions: [], idx: 0, score: 0, answered: false, celebrated: false, term: null, poolIds: [] };
-const PRACTICE_TYPES = ['meaning', 'listening', 'sentence'];
+const PRACTICE_TYPES = ['meaning', 'listening', 'picture', 'sentence'];
 const mistakeChallenge = { active: false, term: null, ids: [], round: 1, idx: 0, passed: {}, answered: false };
 
 function currentTermMistakes() {
@@ -2140,8 +2613,11 @@ function initPracticeSelect() {
   const desiredOption = Array.prototype.find.call(sel.options, option => option.value === desired);
   if (desiredOption) desiredOption.setAttribute('selected', '');
   const sentenceOption = document.querySelector('#practice-type option[value="sentence"]');
+  const pictureOption = document.querySelector('#practice-type option[value="picture"]');
   sentenceOption.disabled = currentTerm() === 'QB';
-  if (sentenceOption.disabled && document.getElementById('practice-type').value === 'sentence') document.getElementById('practice-type').value = 'mixed';
+  pictureOption.disabled = currentTerm() === 'QB';
+  if ((sentenceOption.disabled && document.getElementById('practice-type').value === 'sentence') ||
+      (pictureOption.disabled && document.getElementById('practice-type').value === 'picture')) document.getElementById('practice-type').value = 'mixed';
   const challengeButton = document.getElementById('mistake-challenge-start');
   challengeButton.disabled = mistakes.length === 0;
   challengeButton.textContent = mistakes.length ? `🔥 错题三轮闯关（${mistakes.length}）` : '🎉 暂无错题';
@@ -2182,7 +2658,9 @@ function practicePool() {
 function startPractice() {
   mistakeChallenge.active = false;
   const scope = document.getElementById('practice-unit').value;
-  const pool = practicePool();
+  const selectedType = document.getElementById('practice-type').value;
+  let pool = practicePool();
+  if (selectedType === 'picture') pool = pool.filter(x => x.visual);
   const area = document.getElementById('practice-area');
   if (!pool.length) {
     area.innerHTML = '';
@@ -2193,10 +2671,11 @@ function startPractice() {
     ]));
     return;
   }
-  const selectedType = document.getElementById('practice-type').value;
   const targets = shuffle(pool.slice()).slice(0, Math.min(10, pool.length));
   practice.questions = targets.map(x => {
-    const availableTypes = x.example ? PRACTICE_TYPES : ['meaning', 'listening'];
+    const availableTypes = ['meaning', 'listening'];
+    if (x.visual) availableTypes.push('picture');
+    if (x.example) availableTypes.push('sentence');
     const type = selectedType === 'mixed' ? availableTypes[Math.floor(Math.random() * availableTypes.length)] :
       selectedType === 'sentence' && !x.example ? 'meaning' : selectedType;
     return { id: x.id, type: type };
@@ -2255,7 +2734,7 @@ function renderPractice() {
 
   const q = practice.questions[practice.idx];
   const x = BY_ID[q.id];
-  const typeNames = { meaning: '看中文选英文', listening: '听音选单词', sentence: '例句选词填空' };
+  const typeNames = { meaning: '看中文选英文', listening: '听音选单词', picture: '看图选单词', sentence: '例句选词填空' };
   const prompt = el('div', { class: 'quiz-prompt' + (q.type === 'sentence' ? ' sentence' : '') });
   const helper = el('div', { class: 'hint' });
 
@@ -2265,6 +2744,12 @@ function renderPractice() {
   } else if (q.type === 'listening') {
     prompt.append(el('button', { class: 'btn-icon', style: 'font-size:54px', 'aria-label': '播放题目发音', text: '🔊', onclick: () => speak(x.w) }));
     helper.textContent = '听发音，选择正确的单词或词组';
+  } else if (q.type === 'picture') {
+    prompt.classList.add('picture-prompt');
+    prompt.setAttribute('role', 'img');
+    prompt.setAttribute('aria-label', '看图选择单词');
+    prompt.textContent = x.visual;
+    helper.textContent = '看图，选择正确的英文';
   } else {
     prompt.textContent = blankExample(x);
     helper.textContent = x.exampleCn;
@@ -2298,6 +2783,7 @@ function answerPractice(chosenId) {
   const q = practice.questions[practice.idx];
   const x = BY_ID[q.id];
   const right = chosenId === x.id;
+  recordStat('practice', right);
   document.querySelectorAll('#practice-area .quiz-option').forEach(button => {
     button.disabled = true;
     const id = Number(button.getAttribute('data-option-id'));
@@ -2307,9 +2793,9 @@ function answerPractice(chosenId) {
   const fb = document.getElementById('practice-feedback');
   if (right) {
     practice.score++;
-    const practiceRewarded = awardPoints(`practice:${today()}:${x.id}`, 2, '练习答对');
+    const practiceRewarded = awardPoints(`practice:${today()}:${x.key}`, 2, '练习答对');
     fb.className = 'feedback ok';
-    fb.textContent = practiceRewarded ? '✅ 回答正确！　⭐ +2' : '✅ 回答正确！';
+    fb.textContent = practiceRewarded ? `✅ 回答正确！　⭐ +${practiceRewarded}` : '✅ 回答正确！';
   } else {
     addMistake(x.id);
     save();
@@ -2431,6 +2917,7 @@ function answerMistakeChoice(chosenId) {
   mistakeChallenge.answered = true;
   const target = BY_ID[mistakeChallenge.ids[mistakeChallenge.idx]];
   const right = chosenId === target.id;
+  recordStat('challenge', right);
   if (!right) mistakeChallenge.passed[target.id] = false;
   document.querySelectorAll('#practice-area .quiz-option').forEach(button => {
     button.disabled = true;
@@ -2453,6 +2940,7 @@ function answerMistakeSpelling() {
   input.disabled = true;
   const target = BY_ID[mistakeChallenge.ids[mistakeChallenge.idx]];
   const right = normalize(input.value) === normalize(target.w);
+  recordStat('challenge', right);
   if (!right) mistakeChallenge.passed[target.id] = false;
   input.style.borderColor = right ? 'var(--green)' : 'var(--red)';
   const feedback = document.getElementById('challenge-feedback');
@@ -2483,7 +2971,7 @@ function finishMistakeChallenge() {
   const retained = mistakeChallenge.ids.filter(id => !mistakeChallenge.passed[id]);
   data.mistakes = data.mistakes.filter(id => !conquered.includes(id));
   let bonus = 0;
-  conquered.forEach(id => { if (awardPoints(`mistake-challenge:${today()}:${id}`, 5, '错题闯关成功')) bonus += 5; });
+  conquered.forEach(id => { bonus += awardPoints(`mistake-challenge:${today()}:${BY_ID[id].key}`, 5, '错题闯关成功'); });
   save();
   mistakeChallenge.active = false;
   initPracticeSelect();
@@ -2542,6 +3030,19 @@ async function readVoiceBlob(id) {
     request.onsuccess = () => resolve(request.result ? request.result.blob : null);
     request.onerror = () => reject(request.error);
   });
+}
+
+async function readVoiceBlobForWord(word) {
+  const stable = await readVoiceBlob(word.key);
+  if (stable) return stable;
+  const legacy = await readVoiceBlob(word.id);
+  if (legacy) {
+    try {
+      await saveVoiceBlob(word.key, legacy);
+      await deleteVoiceBlob(word.id);
+    } catch (error) { /* 保留旧录音，下次继续尝试迁移 */ }
+  }
+  return legacy;
 }
 
 async function saveVoiceBlob(id, blob) {
@@ -2673,6 +3174,9 @@ async function renderVoiceWord() {
   const x = BY_ID[id];
   const token = ++voiceState.loadToken;
   document.getElementById('voice-word').textContent = x.w;
+  const voicePicture = document.getElementById('voice-picture');
+  voicePicture.textContent = x.visual || '';
+  voicePicture.style.display = x.visual ? 'block' : 'none';
   document.getElementById('voice-ipa').textContent = x.ipa;
   document.getElementById('voice-cn').textContent = x.cn;
   document.getElementById('voice-example').textContent = x.example;
@@ -2703,7 +3207,7 @@ async function renderVoiceWord() {
   }
 
   try {
-    const blob = await readVoiceBlob(id);
+    const blob = await readVoiceBlobForWord(x);
     if (token !== voiceState.loadToken) return;
     setVoiceBlob(blob);
     document.getElementById('voice-status').textContent = blob ? '已找到这个单词的录音，可以回放或重新录制。' : '点击“开始录音”进行跟读';
@@ -2784,9 +3288,9 @@ function saveAutomaticScore(x, result) {
     transcript: result.transcript,
     date: today()
   };
-  if (result.score >= 60) awardPoints(`pronunciation:${x.id}:60`, 2, '发音达标');
-  if (result.score >= 80) awardPoints(`pronunciation:${x.id}:80`, 2, '发音优秀');
-  if (result.score >= 95) awardPoints(`pronunciation:${x.id}:95`, 3, '发音满星');
+  if (result.score >= 60) awardPoints(`pronunciation:${x.key}:60`, 2, '发音达标');
+  if (result.score >= 80) awardPoints(`pronunciation:${x.key}:80`, 2, '发音优秀');
+  if (result.score >= 95) awardPoints(`pronunciation:${x.key}:95`, 3, '发音满星');
   save();
 }
 
@@ -2940,7 +3444,7 @@ async function startVoiceRecording() {
       if (blob.size) {
         setVoiceBlob(blob);
         try {
-          await saveVoiceBlob(x.id, blob);
+          await saveVoiceBlob(x.key, blob);
           voiceState.recordingSaved = true;
         } catch (error) {
           voiceState.recordingSaved = false;
@@ -3011,9 +3515,11 @@ function moveVoice(step) {
 async function removeCurrentVoice() {
   if (!voiceState.list.length) return;
   const id = voiceState.list[voiceState.idx];
+  const word = BY_ID[id];
   setVoiceBlob(null);
   try {
-    await deleteVoiceBlob(id);
+    await deleteVoiceBlob(word.key);
+    await deleteVoiceBlob(word.id);
     document.getElementById('voice-status').textContent = '录音已删除，可以重新录制。';
   } catch (error) {
     document.getElementById('voice-status').textContent = '录音已从当前页面移除。';
@@ -3023,10 +3529,11 @@ async function removeCurrentVoice() {
 async function acceptVoiceFile(file) {
   if (!file || !voiceState.list.length) return;
   const id = voiceState.list[voiceState.idx];
+  const word = BY_ID[id];
   setVoiceBlob(file);
   showVoiceScore(null, '导入录音未自动评分', '基础评分需要在 HTTPS 页面中直接录音，浏览器不能对已选择的音频文件重新识别。');
   try {
-    await saveVoiceBlob(id, file);
+    await saveVoiceBlob(word.key, file);
     document.getElementById('voice-status').textContent = '✅ 录音已保存，可以回放。';
   } catch (error) {
     document.getElementById('voice-status').textContent = '录音可以回放，但当前浏览器无法永久保存。';
@@ -3082,9 +3589,11 @@ function checkDict() {
   if (!input.value.trim()) { input.focus(); return; }
   const x = BY_ID[dict.list[dict.idx]];
   dict.answered = true;
-  if (normalize(input.value) === normalize(x.w)) {
-    const dictRewarded = awardPoints(`dictation:${today()}:${x.id}`, 3, '默写正确');
-    fb.className = 'feedback ok'; fb.textContent = '✅ 正确！' + x.ipa + (dictRewarded ? '　⭐ +3' : '');
+  const dictRight = normalize(input.value) === normalize(x.w);
+  recordStat('dictation', dictRight);
+  if (dictRight) {
+    const dictRewarded = awardPoints(`dictation:${today()}:${x.key}`, 3, '默写正确');
+    fb.className = 'feedback ok'; fb.textContent = '✅ 正确！' + x.ipa + (dictRewarded ? `　⭐ +${dictRewarded}` : '');
     input.style.borderColor = 'var(--green)';
     speak(x.w);
     setTimeout(nextDict, 1200);
@@ -3220,6 +3729,7 @@ document.getElementById('parent-pin').addEventListener('keydown', event => { if 
 document.getElementById('parent-term').addEventListener('change', fillParentScopeOptions);
 document.getElementById('parent-core-level').addEventListener('change', fillParentScopeOptions);
 document.getElementById('parent-add-reward').addEventListener('click', addParentReward);
+document.getElementById('weekly-save-image').addEventListener('click', saveWeeklyReportImage);
 document.getElementById('parent-reset-rewards').addEventListener('click', resetParentRewards);
 document.getElementById('parent-save').addEventListener('click', saveParentSettings);
 document.getElementById('parent-lock').addEventListener('click', lockParentMode);
