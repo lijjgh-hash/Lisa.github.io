@@ -213,6 +213,8 @@
   .offline-badge { display:none; position:fixed; z-index:120; right:12px; bottom:calc(12px + env(safe-area-inset-bottom));
                    padding:7px 11px; border:2px solid #fff; border-radius:16px; background:#687a98; color:#fff; font-weight:800; box-shadow:0 5px 14px rgba(32,55,90,.2); }
   .offline-badge.show { display:block; }
+  .cloud-inputs { display:grid; gap:8px; margin-bottom:8px; }
+  .cloud-inputs input { width:100%; box-sizing:border-box; }
   .version-text { font-size:18px; font-weight:800; color:#405a83; margin:4px 0 2px; }
   .update-banner { display:none; position:fixed; z-index:250; left:12px; right:12px; margin:0 auto; bottom:calc(14px + env(safe-area-inset-bottom));
                    max-width:520px; box-sizing:border-box; align-items:center; gap:10px; flex-wrap:wrap;
@@ -496,6 +498,24 @@
           <div id="app-version-text" class="version-text"></div>
           <div class="btn-group"><button type="button" class="btn btn-primary" id="check-update-btn">🔄 检查更新</button><button type="button" class="btn btn-green" id="parent-update-now" style="display:none">立即更新</button></div>
           <div id="update-check-status" class="feedback" aria-live="polite"></div>
+        </div>
+        <div class="parent-field full cloud-field"><label>☁️ 云端同步（Supabase）</label>
+          <div id="cloud-config" class="cloud-inputs">
+            <input type="url" id="cloud-url" placeholder="Project URL，例如 https://xxxx.supabase.co" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Supabase Project URL">
+            <input type="text" id="cloud-key" placeholder="anon 或 publishable key" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Supabase anon key">
+          </div>
+          <div id="cloud-login" class="cloud-inputs">
+            <input type="email" id="cloud-email" placeholder="家长邮箱" autocomplete="username" autocapitalize="off" aria-label="家长邮箱">
+            <input type="password" id="cloud-password" placeholder="密码（至少 6 位）" autocomplete="current-password" aria-label="云同步密码">
+            <div class="btn-group"><button type="button" class="btn btn-primary" id="cloud-signin">登录</button><button type="button" class="btn btn-gray" id="cloud-signup">注册新账号</button></div>
+          </div>
+          <div id="cloud-account" style="display:none">
+            <div id="cloud-account-text" class="version-text"></div>
+            <div id="cloud-last-sync" class="hint"></div>
+            <div class="btn-group"><button type="button" class="btn btn-green" id="cloud-sync-now">🔄 立即同步</button><button type="button" class="btn btn-gray" id="cloud-signout">退出云同步</button></div>
+          </div>
+          <div class="hint">同一个孩子的所有设备登录同一个账号，就会自动同步进度、错题、积分和设置。录音只保存在本机，不上传。</div>
+          <div id="cloud-status" class="feedback" aria-live="polite"></div>
         </div>
       </div>
       <div class="section-title">📊 本周学习报告（最近 7 天）</div>
@@ -1105,10 +1125,14 @@ const defaultData = () => ({
   version: 4, term: '1A', goal: 5, progress: {}, checkins: {}, mistakes: [], scores: {},
   rewards: { points: 0, ledger: {}, shop: defaultRewardShop(), redemptions: [] },
   parent: { pin: '1234', dictation: true, voice: true, dailyMinutes: 0, coreLevel: 1, reduceMotion: false, dailyPointCap: 0, redeemDailyLimit: 1 }, usage: {}, stats: {},
-  studyScopes: { '1A': 'all', '1B': 'all', 'QB': 'all' }, dailies: {}, daily: null
+  studyScopes: { '1A': 'all', '1B': 'all', 'QB': 'all' }, dailies: {}, daily: null,
+  // 云同步用：记录每个单词进度/错题/家长设置最后修改时间，resetAt 表示清空或导入的时间
+  sync: { at: {}, resetAt: 0 }
 });
 let storageAvailable = true;
+let changeSnapshot = null;
 let data = load();
+changeSnapshot = takeChangeSnapshot(serializeStoredData(data));
 
 function validTerm(term) { return term === '1A' || term === '1B' || term === 'QB'; }
 function validDate(value) { return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value); }
@@ -1199,8 +1223,20 @@ function normalizeStoredData(raw) {
       emoji: typeof item.emoji === 'string' ? item.emoji.slice(0, 6) : '🎁',
       name: typeof item.name === 'string' ? item.name.slice(0, 30) : '家庭奖励',
       cost: Math.max(1, Math.min(9999, Math.floor(Number(item.cost) || 1))),
-      date: validDate(item.date) ? item.date : ''
+      date: validDate(item.date) ? item.date : '',
+      at: Number(item.at) > 0 ? Math.floor(Number(item.at)) : 0
     }));
+  }
+  if (raw.sync && typeof raw.sync === 'object') {
+    clean.sync.resetAt = Number(raw.sync.resetAt) > 0 ? Math.floor(Number(raw.sync.resetAt)) : 0;
+    if (raw.sync.at && typeof raw.sync.at === 'object') Object.keys(raw.sync.at).slice(0, 6000).forEach(key => {
+      const stamp = Math.floor(Number(raw.sync.at[key]) || 0);
+      if (stamp <= 0) return;
+      if (key === 'settings') { clean.sync.at.settings = stamp; return; }
+      const match = /^([pm]):(.+)$/.exec(key);
+      const id = match && resolveWordId(match[2]);
+      if (id) clean.sync.at[match[1] + ':' + BY_ID[id].key] = stamp;
+    });
   }
   if (raw.parent && typeof raw.parent === 'object') {
     clean.parent.pin = /^\d{4,6}$/.test(String(raw.parent.pin || '')) ? String(raw.parent.pin) : '1234';
@@ -1269,9 +1305,50 @@ function load() {
   try { return normalizeStoredData(JSON.parse(stored)); }
   catch (error) { return defaultData(); }
 }
+// 记录哪些单词进度、错题、家长设置发生了变化，供多设备合并时判断谁更新
+function takeChangeSnapshot(serialized) {
+  const progress = {};
+  Object.keys(serialized.progress || {}).forEach(key => {
+    const item = serialized.progress[key];
+    progress[key] = item.stage + '|' + (item.next || '');
+  });
+  return {
+    settings: JSON.stringify([serialized.goal, serialized.parent, serialized.rewards && serialized.rewards.shop, serialized.studyScopes]),
+    progress: progress,
+    mistakes: (serialized.mistakes || []).slice()
+  };
+}
+function trackChanges(serialized) {
+  const snapshot = takeChangeSnapshot(serialized);
+  const previous = changeSnapshot;
+  changeSnapshot = snapshot;
+  if (!previous) return false;
+  if (!data.sync || typeof data.sync !== 'object') data.sync = { at: {}, resetAt: 0 };
+  if (!data.sync.at) data.sync.at = {};
+  const stamps = data.sync.at, now = Date.now();
+  let changed = false;
+  if (snapshot.settings !== previous.settings) { stamps.settings = now; changed = true; }
+  const progressKeys = {};
+  Object.keys(snapshot.progress).concat(Object.keys(previous.progress)).forEach(key => { progressKeys[key] = true; });
+  Object.keys(progressKeys).forEach(key => {
+    if (snapshot.progress[key] !== previous.progress[key]) { stamps['p:' + key] = now; changed = true; }
+  });
+  const before = {}, after = {};
+  previous.mistakes.forEach(key => { before[key] = true; });
+  snapshot.mistakes.forEach(key => { after[key] = true; });
+  Object.keys(before).concat(Object.keys(after)).forEach(key => {
+    if (!before[key] !== !after[key]) { stamps['m:' + key] = now; changed = true; }
+  });
+  return changed;
+}
 function save() {
   if (!storageAvailable) return;
-  try { localStorage.setItem(KEY, JSON.stringify(serializeStoredData(data))); }
+  try {
+    const serialized = serializeStoredData(data);
+    if (trackChanges(serialized)) serialized.sync = JSON.parse(JSON.stringify(data.sync));
+    localStorage.setItem(KEY, JSON.stringify(serialized));
+    try { noteCloudChange(serialized); } catch (error) { /* 云同步出错不影响本机保存 */ }
+  }
   catch (error) { storageAvailable = false; }
 }
 
@@ -1310,6 +1387,8 @@ function importProgressFile(file) {
       if (!payload || payload.format !== 'word-checkin-backup' || payload.version !== 1 || !payload.data) throw new Error('invalid backup');
       if (!confirm('导入会替换当前打卡进度、错题和评分，录音不受影响。确定继续吗？')) return;
       data = normalizeStoredData(payload.data);
+      // 导入视为一次重置：同步时以导入的数据覆盖云端
+      data.sync.resetAt = Date.now();
       save();
       status.className = 'backup-status ok';
       status.textContent = '导入成功，正在刷新页面…';
@@ -1324,6 +1403,433 @@ function importProgressFile(file) {
     status.textContent = '无法读取备份文件。';
   };
   reader.readAsText(file, 'utf-8');
+}
+
+// ================= 多设备数据合并 =================
+function cloneJson(value) { return JSON.parse(JSON.stringify(value)); }
+function syncStamps(doc) { return doc.sync && doc.sync.at ? doc.sync.at : {}; }
+function sumLedgerOnly(source, other) {
+  let total = 0;
+  Object.keys(source).forEach(key => { if (!other[key]) total += Number(source[key].points) || 0; });
+  return total;
+}
+function mergeRedemptions(left, right) {
+  // 按"同一条兑换"计数，取两边较多的次数，避免重复也避免丢失
+  const groups = {}, order = [];
+  function add(list, side) {
+    const counts = {};
+    (list || []).forEach(item => {
+      const key = [item.at || 0, item.date, item.id, item.cost].join('|');
+      counts[key] = (counts[key] || 0) + 1;
+      if (!groups[key]) { groups[key] = { item: item, left: 0, right: 0 }; order.push(key); }
+      groups[key][side] = counts[key];
+    });
+  }
+  add(left, 'left');
+  add(right, 'right');
+  const result = [];
+  order.forEach(key => {
+    const group = groups[key];
+    for (let i = 0; i < Math.max(group.left, group.right); i++) result.push(cloneJson(group.item));
+  });
+  result.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.at || 0) - (b.at || 0));
+  return result.slice(-100);
+}
+// local / remote 都是 serializeStoredData 的结果（稳定词条编号）
+function mergeSyncData(local, remote) {
+  const localReset = local.sync && local.sync.resetAt || 0;
+  const remoteReset = remote.sync && remote.sync.resetAt || 0;
+  if (remoteReset > localReset) return Object.assign(cloneJson(remote), { term: local.term, daily: null });
+  if (localReset > remoteReset) return Object.assign(cloneJson(local), { daily: null });
+
+  const out = cloneJson(local);
+  const la = syncStamps(local), ra = syncStamps(remote);
+  out.daily = null;
+  out.sync = { at: {}, resetAt: localReset };
+
+  // 家长设置：谁后改用谁；都没有记录时以云端为准（第一台设备上传的设置）
+  const localSettingsAt = la.settings || 0, remoteSettingsAt = ra.settings || 0;
+  const settingsSource = remoteSettingsAt >= localSettingsAt ? remote : local;
+  out.goal = settingsSource.goal;
+  out.parent = cloneJson(settingsSource.parent);
+  out.rewards.shop = cloneJson(settingsSource.rewards.shop);
+  out.studyScopes = cloneJson(settingsSource.studyScopes);
+  if (Math.max(localSettingsAt, remoteSettingsAt)) out.sync.at.settings = Math.max(localSettingsAt, remoteSettingsAt);
+
+  // 单词进度：两边都有修改时间时用更新的；否则取格数更多的，避免进度倒退
+  const progressKeys = {};
+  Object.keys(local.progress).concat(Object.keys(remote.progress)).forEach(key => { progressKeys[key] = true; });
+  Object.keys(la).concat(Object.keys(ra)).forEach(key => { if (key.indexOf('p:') === 0) progressKeys[key.slice(2)] = true; });
+  out.progress = {};
+  Object.keys(progressKeys).forEach(key => {
+    const lt = la['p:' + key] || 0, rt = ra['p:' + key] || 0;
+    const lp = local.progress[key], rp = remote.progress[key];
+    let pick;
+    if (lt && rt) pick = rt > lt ? rp : lp;
+    else {
+      const ls = lp ? lp.stage : 0, rs = rp ? rp.stage : 0;
+      pick = rs > ls || (rs === ls && rp && (rp.next || '') > (lp && lp.next || '')) ? rp : lp;
+    }
+    if (pick) out.progress[key] = cloneJson(pick);
+    if (Math.max(lt, rt)) out.sync.at['p:' + key] = Math.max(lt, rt);
+  });
+
+  // 错题：有修改时间的一方说了算（加入或移除）；都没有记录时取并集
+  const localMistakes = {}, remoteMistakes = {}, mistakeKeys = [];
+  local.mistakes.forEach(key => { localMistakes[key] = true; });
+  remote.mistakes.forEach(key => { remoteMistakes[key] = true; });
+  local.mistakes.concat(remote.mistakes).concat(Object.keys(la).concat(Object.keys(ra))
+    .filter(key => key.indexOf('m:') === 0).map(key => key.slice(2))).forEach(key => {
+    if (mistakeKeys.indexOf(key) < 0) mistakeKeys.push(key);
+  });
+  out.mistakes = [];
+  mistakeKeys.forEach(key => {
+    const lt = la['m:' + key] || 0, rt = ra['m:' + key] || 0;
+    let present;
+    if (lt || rt) present = rt > lt ? !!remoteMistakes[key] : !!localMistakes[key];
+    else present = !!(localMistakes[key] || remoteMistakes[key]);
+    if (present) out.mistakes.push(key);
+    if (Math.max(lt, rt)) out.sync.at['m:' + key] = Math.max(lt, rt);
+  });
+
+  Object.keys(remote.checkins || {}).forEach(date => { out.checkins[date] = true; });
+  Object.keys(remote.usage || {}).forEach(date => { out.usage[date] = Math.max(out.usage[date] || 0, remote.usage[date] || 0); });
+  Object.keys(remote.stats || {}).forEach(date => {
+    const day = out.stats[date] || {};
+    STAT_FIELDS.forEach(field => { day[field] = Math.max(day[field] || 0, remote.stats[date][field] || 0); });
+    out.stats[date] = day;
+  });
+  Object.keys(remote.scores || {}).forEach(key => {
+    const r = remote.scores[key], l = out.scores[key];
+    if (!l) { out.scores[key] = cloneJson(r); return; }
+    const newer = (r.date || '') > (l.date || '') ? r : l;
+    out.scores[key] = {
+      best: Math.max(l.best || 0, r.best || 0), last: newer.last, attempts: Math.max(l.attempts || 0, r.attempts || 0),
+      transcript: newer.transcript, date: newer.date
+    };
+  });
+  ['1A', '1B', 'QB'].forEach(term => {
+    const l = local.dailies && local.dailies[term], r = remote.dailies && remote.dailies[term];
+    if (!r) return;
+    if (!l || r.date > l.date || (r.date === l.date && r.strategy === l.strategy && r.pos > l.pos)) out.dailies[term] = cloneJson(r);
+  });
+
+  // 积分：流水按唯一编号合并；总分 = 一方总分 + 另一方独有的流水
+  const localLedger = local.rewards.ledger || {}, remoteLedger = remote.rewards.ledger || {};
+  out.rewards.ledger = Object.assign({}, cloneJson(remoteLedger), cloneJson(localLedger));
+  out.rewards.points = Math.max(0,
+    (local.rewards.points || 0) + sumLedgerOnly(remoteLedger, localLedger),
+    (remote.rewards.points || 0) + sumLedgerOnly(localLedger, remoteLedger));
+  out.rewards.redemptions = mergeRedemptions(local.rewards.redemptions, remote.rewards.redemptions);
+  return out;
+}
+
+// ================= 云端同步（Supabase） =================
+const CLOUD_STORE_KEY = 'word_checkin_cloud_v1';
+const CLOUD_TABLE = 'word_checkin_sync';
+// 可以直接在这里填写 Project URL 和 anon/publishable key，所有设备就不用再手动输入
+const CLOUD_DEFAULT = { url: '', anonKey: '' };
+let cloud = loadCloudConfig();
+let cloudSyncing = false;
+let cloudPending = false;
+let cloudTimer = null;
+let cloudLastContent = '';
+let cloudSaveCounter = 0;
+
+function loadCloudConfig() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(CLOUD_STORE_KEY) || 'null'); } catch (error) { raw = null; }
+  const config = { url: CLOUD_DEFAULT.url, anonKey: CLOUD_DEFAULT.anonKey, email: '', session: null, lastSyncAt: 0 };
+  if (!raw || typeof raw !== 'object') return config;
+  if (typeof raw.url === 'string' && raw.url) config.url = raw.url;
+  if (typeof raw.anonKey === 'string' && raw.anonKey) config.anonKey = raw.anonKey;
+  if (typeof raw.email === 'string') config.email = raw.email.slice(0, 120);
+  const s = raw.session;
+  if (s && typeof s.access_token === 'string' && typeof s.refresh_token === 'string' && typeof s.user_id === 'string') {
+    config.session = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: Number(s.expires_at) || 0, user_id: s.user_id };
+  }
+  config.lastSyncAt = Number(raw.lastSyncAt) || 0;
+  return config;
+}
+function saveCloudConfig() {
+  try {
+    localStorage.setItem(CLOUD_STORE_KEY, JSON.stringify({
+      url: cloud.url, anonKey: cloud.anonKey, email: cloud.email, session: cloud.session, lastSyncAt: cloud.lastSyncAt
+    }));
+  } catch (error) { /* 无法保存时仅本次有效 */ }
+}
+function cloudReady() { return !!(cloud.url && cloud.anonKey && cloud.session); }
+function normalizeCloudUrl(value) {
+  const url = String(value || '').trim().replace(/\/+$/, '');
+  return /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url) ? url : '';
+}
+function isSecretCloudKey(key) {
+  if (/^sb_secret_/.test(key)) return true;
+  const parts = key.split('.');
+  if (parts.length !== 3) return false;
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return !!payload && payload.role === 'service_role';
+  } catch (error) { return false; }
+}
+function deviceName() {
+  const ua = navigator.userAgent || '';
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/Android/.test(ua)) return 'Android';
+  return '电脑';
+}
+
+function cloudFetch(path, options, withUser) {
+  const headers = { apikey: cloud.anonKey, 'Content-Type': 'application/json' };
+  if (withUser && cloud.session) headers.Authorization = 'Bearer ' + cloud.session.access_token;
+  Object.keys(options.headers || {}).forEach(name => { headers[name] = options.headers[name]; });
+  return fetch(cloud.url + path, {
+    method: options.method || 'GET', headers: headers, cache: 'no-store',
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  }).then(response => response.text().then(text => {
+    let body = null;
+    try { body = text ? JSON.parse(text) : null; } catch (error) { body = null; }
+    return { ok: response.ok, status: response.status, body: body };
+  }));
+}
+function cloudErrorText(result) {
+  const body = result.body || {};
+  const raw = String(body.error_description || body.msg || body.message || body.error || '');
+  const code = String(body.code || body.error_code || '');
+  if (/invalid login credentials/i.test(raw)) return '邮箱或密码不正确。';
+  if (/email not confirmed/i.test(raw) || code === 'email_not_confirmed') return '邮箱还没确认：请先打开邮件里的确认链接。';
+  if (/already registered|already exists/i.test(raw) || code === 'user_already_exists') return '这个邮箱已经注册过，请直接登录。';
+  if (/password/i.test(raw) && /(6|characters|short|weak)/i.test(raw)) return '密码太简单，请至少 6 位并混合字母和数字。';
+  if (code === '42501' || /permission denied/i.test(raw)) return '没有数据表权限：请在 Supabase 运行建表 SQL（含 GRANT 语句）。';
+  if (code === 'PGRST205' || code === '42P01' || /could not find the table|does not exist/i.test(raw)) return '没有找到数据表 word_checkin_sync：请先运行建表 SQL。';
+  if (/invalid api key|no api key/i.test(raw) || result.status === 401 && !raw) return 'API key 不正确，请检查 anon / publishable key。';
+  if (result.status === 429) return '请求太频繁，请稍后再试。';
+  return (raw || '服务器返回错误') + '（' + result.status + '）';
+}
+function storeCloudSession(body) {
+  cloud.session = {
+    access_token: body.access_token,
+    refresh_token: body.refresh_token,
+    expires_at: Number(body.expires_at) || Math.floor(Date.now() / 1000) + (Number(body.expires_in) || 3600),
+    user_id: body.user && body.user.id ? body.user.id : cloud.session && cloud.session.user_id
+  };
+  if (body.user && body.user.email) cloud.email = body.user.email;
+  saveCloudConfig();
+}
+function ensureFreshToken(force) {
+  if (!cloud.session) return Promise.reject(new Error('请先登录云同步。'));
+  if (!force && cloud.session.expires_at - 60 > Date.now() / 1000) return Promise.resolve();
+  return cloudFetch('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: cloud.session.refresh_token } }, false)
+    .then(result => {
+      if (result.ok && result.body && result.body.access_token) { storeCloudSession(result.body); return; }
+      if (result.status === 400 || result.status === 401 || result.status === 403) {
+        cloud.session = null;
+        saveCloudConfig();
+        throw new Error('登录已过期，请重新登录云同步。');
+      }
+      throw new Error(cloudErrorText(result));
+    });
+}
+function cloudAuthed(path, options) {
+  return ensureFreshToken(false).then(() => cloudFetch(path, options, true)).then(result => {
+    if (result.status !== 401) return result;
+    return ensureFreshToken(true).then(() => cloudFetch(path, options, true));
+  });
+}
+
+function cloudContentKey(serialized) {
+  return JSON.stringify(Object.assign({}, serialized, { usage: null, daily: null }));
+}
+function noteCloudChange(serialized) {
+  cloudSaveCounter++;
+  if (!cloudReady()) return;
+  const content = cloudContentKey(serialized);
+  if (content === cloudLastContent) return;
+  cloudLastContent = content;
+  scheduleCloudSync(15000);
+}
+function scheduleCloudSync(delay) {
+  if (!cloudReady()) return;
+  clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(() => { cloudTimer = null; cloudSync(); }, delay);
+}
+
+function applyMergedData(merged) {
+  const term = data.term;
+  const before = cloudContentKey(serializeStoredData(data));
+  const next = normalizeStoredData(merged);
+  next.term = term;
+  const changed = cloudContentKey(serializeStoredData(next)) !== before;
+  if (!changed) return false;
+  data = next;
+  data.daily = null;
+  changeSnapshot = takeChangeSnapshot(serializeStoredData(data));
+  cloudLastContent = cloudContentKey(serializeStoredData(data));
+  save();
+  refreshAfterCloudChange();
+  return true;
+}
+function refreshAfterCloudChange() {
+  renderHeader();
+  applyParentControls();
+  initTodayScope();
+  const activeTab = document.querySelector('.tab.active');
+  const tab = activeTab ? activeTab.dataset.tab : 'today';
+  // 练习、跟读、默写进行中不打断，下次进入时自动使用新数据
+  if (tab === 'today') renderToday(); else ensureDaily();
+  if (tab === 'list') renderList();
+  if (tab === 'record') renderRecord();
+}
+
+function cloudSync() {
+  if (!cloudReady()) return Promise.resolve(false);
+  if (cloudSyncing) { cloudPending = true; return Promise.resolve(false); }
+  if (navigator.onLine === false) { setCloudStatus('📴 现在离线，联网后会自动同步。', ''); return Promise.resolve(false); }
+  clearTimeout(cloudTimer);
+  cloudTimer = null;
+  cloudSyncing = true;
+  cloudPending = false;
+  setCloudStatus('☁️ 正在同步…', '');
+  const table = '/rest/v1/' + CLOUD_TABLE;
+  let changedLocal = false;
+  function attempt(round) {
+    if (round >= 3) return Promise.reject(new Error('另一台设备正在同步，请稍后再试。'));
+    const userFilter = 'user_id=eq.' + encodeURIComponent(cloud.session.user_id);
+    return cloudAuthed(table + '?select=data,rev&' + userFilter, { method: 'GET' }).then(got => {
+      if (!got.ok) throw new Error(cloudErrorText(got));
+      const row = Array.isArray(got.body) && got.body.length ? got.body[0] : null;
+      const counterAtRead = cloudSaveCounter;
+      const local = serializeStoredData(data);
+      const merged = row && row.data ? mergeSyncData(local, serializeStoredData(normalizeStoredData(row.data))) : local;
+      const payload = { data: merged, device: deviceName(), updated_at: new Date().toISOString() };
+      let write;
+      if (row) {
+        payload.rev = (Number(row.rev) || 0) + 1;
+        write = cloudAuthed(table + '?' + userFilter + '&rev=eq.' + encodeURIComponent(row.rev) + '&select=rev',
+          { method: 'PATCH', body: payload, headers: { Prefer: 'return=representation' } });
+      } else {
+        payload.user_id = cloud.session.user_id;
+        payload.rev = 1;
+        write = cloudAuthed(table, { method: 'POST', body: payload, headers: { Prefer: 'return=minimal' } });
+      }
+      return write.then(result => {
+        if (row && result.ok && Array.isArray(result.body) && !result.body.length) return attempt(round + 1);
+        if (!row && result.status === 409) return attempt(round + 1);
+        if (!result.ok) throw new Error(cloudErrorText(result));
+        // 同步期间孩子又操作了：把新操作合并进来，下次再上传
+        let finalData = merged;
+        if (cloudSaveCounter !== counterAtRead) {
+          finalData = mergeSyncData(serializeStoredData(data), merged);
+          cloudPending = true;
+        }
+        changedLocal = applyMergedData(finalData);
+      });
+    });
+  }
+  return attempt(0).then(() => {
+    cloud.lastSyncAt = Date.now();
+    saveCloudConfig();
+    setCloudStatus(changedLocal ? '✅ 已同步，并合并了其他设备的学习记录。' : '✅ 已同步。', 'ok');
+    return true;
+  }).catch(error => {
+    setCloudStatus('⚠️ 同步失败：' + (error && error.message ? error.message : '网络错误，请稍后再试。'), 'bad');
+    return false;
+  }).then(result => {
+    cloudSyncing = false;
+    renderCloudPanel();
+    if (cloudPending) scheduleCloudSync(3000);
+    return result;
+  });
+}
+
+function setCloudStatus(text, kind) {
+  const status = document.getElementById('cloud-status');
+  if (!status) return;
+  status.className = 'feedback ' + (kind || '');
+  status.textContent = text;
+}
+function cloudTimeText(ms) {
+  if (!ms) return '还没有同步过';
+  const d = new Date(ms);
+  const two = n => (n < 10 ? '0' : '') + n;
+  return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + two(d.getHours()) + ':' + two(d.getMinutes());
+}
+function renderCloudPanel() {
+  const ready = cloudReady();
+  document.getElementById('cloud-config').style.display = ready ? 'none' : '';
+  document.getElementById('cloud-login').style.display = ready ? 'none' : '';
+  document.getElementById('cloud-account').style.display = ready ? '' : 'none';
+  document.getElementById('cloud-url').value = cloud.url || '';
+  document.getElementById('cloud-key').value = cloud.anonKey || '';
+  if (!document.getElementById('cloud-email').value) document.getElementById('cloud-email').value = cloud.email || '';
+  document.getElementById('cloud-account-text').textContent = ready ? '已登录：' + (cloud.email || '家长账号') : '';
+  document.getElementById('cloud-last-sync').textContent = ready ? '上次同步：' + cloudTimeText(cloud.lastSyncAt) : '';
+  document.getElementById('cloud-sync-now').disabled = cloudSyncing;
+}
+function cloudSignIn(isSignup) {
+  const url = normalizeCloudUrl(document.getElementById('cloud-url').value);
+  const key = document.getElementById('cloud-key').value.trim();
+  const email = document.getElementById('cloud-email').value.trim();
+  const passwordInput = document.getElementById('cloud-password');
+  const password = passwordInput.value;
+  if (!url) { setCloudStatus('请填写正确的 Project URL，例如 https://xxxx.supabase.co', 'bad'); return Promise.resolve(false); }
+  if (!key || key.length > 1000) { setCloudStatus('请填写 anon / publishable key。', 'bad'); return Promise.resolve(false); }
+  if (isSecretCloudKey(key)) { setCloudStatus('这是 secret / service_role 密钥，不能放在网页里。请改用 anon 或 publishable key。', 'bad'); return Promise.resolve(false); }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setCloudStatus('请填写正确的邮箱。', 'bad'); return Promise.resolve(false); }
+  if (password.length < 6) { setCloudStatus('密码至少 6 位。', 'bad'); return Promise.resolve(false); }
+  cloud.url = url;
+  cloud.anonKey = key;
+  cloud.email = email;
+  saveCloudConfig();
+  const buttons = [document.getElementById('cloud-signin'), document.getElementById('cloud-signup')];
+  buttons.forEach(button => { button.disabled = true; });
+  setCloudStatus(isSignup ? '正在注册…' : '正在登录…', '');
+  const path = isSignup ? '/auth/v1/signup' : '/auth/v1/token?grant_type=password';
+  return cloudFetch(path, { method: 'POST', body: { email: email, password: password } }, false).then(result => {
+    if (!result.ok) throw new Error(cloudErrorText(result));
+    if (!result.body || !result.body.access_token) {
+      setCloudStatus('📧 注册成功！请打开邮箱点确认链接，然后回来点「登录」。', 'ok');
+      return false;
+    }
+    passwordInput.value = '';
+    storeCloudSession(result.body);
+    renderCloudPanel();
+    return cloudSync();
+  }).catch(error => {
+    setCloudStatus('⚠️ ' + (error && error.message ? error.message : '无法连接 Supabase，请检查网址和网络。'), 'bad');
+    return false;
+  }).then(result => {
+    buttons.forEach(button => { button.disabled = false; });
+    renderCloudPanel();
+    return result;
+  });
+}
+function cloudSignOut() {
+  if (!confirm('退出后本机的学习记录会保留，但不再和其他设备同步。确定退出吗？')) return;
+  if (cloud.session) cloudFetch('/auth/v1/logout', { method: 'POST' }, true).catch(() => {});
+  clearTimeout(cloudTimer);
+  cloud.session = null;
+  cloud.lastSyncAt = 0;
+  saveCloudConfig();
+  setCloudStatus('已退出云同步。', '');
+  renderCloudPanel();
+}
+function initCloudSync() {
+  document.getElementById('cloud-signin').addEventListener('click', () => cloudSignIn(false));
+  document.getElementById('cloud-signup').addEventListener('click', () => cloudSignIn(true));
+  document.getElementById('cloud-sync-now').addEventListener('click', () => cloudSync());
+  document.getElementById('cloud-signout').addEventListener('click', cloudSignOut);
+  document.getElementById('cloud-password').addEventListener('keydown', event => { if (event.key === 'Enter') cloudSignIn(false); });
+  cloudLastContent = cloudContentKey(serializeStoredData(data));
+  renderCloudPanel();
+  document.addEventListener('visibilitychange', () => {
+    if (!cloudReady()) return;
+    if (document.visibilityState === 'hidden' && cloudTimer) cloudSync();
+    if (document.visibilityState === 'visible' && Date.now() - cloud.lastSyncAt > 30000) cloudSync();
+  });
+  window.addEventListener('online', () => { if (cloudReady()) cloudSync(); });
+  if (cloudReady()) setTimeout(() => cloudSync(), 1500);
 }
 
 // ================= PWA 安装与离线 =================
@@ -1367,7 +1873,7 @@ function updateOfflineBadge() {
 }
 
 // 发布新版本时：这里和 sw.js 的 CACHE_NAME 一起加 1
-const APP_VERSION = 'v32';
+const APP_VERSION = 'v33';
 let waitingWorker = null;
 let updateRequested = false;
 let swRegistration = null;
@@ -2132,7 +2638,7 @@ function confirmRedeem() {
   }
   rewards.points -= item.cost;
   rewards.ledger[`redeem:${Date.now()}:${item.id}`] = { points: -item.cost, reason: '兑换：' + item.name, date: today(), at: Date.now() };
-  rewards.redemptions.push({ id: item.id, emoji: item.emoji, name: item.name, cost: item.cost, date: today() });
+  rewards.redemptions.push({ id: item.id, emoji: item.emoji, name: item.name, cost: item.cost, date: today(), at: Date.now() });
   if (rewards.redemptions.length > 100) rewards.redemptions = rewards.redemptions.slice(-100);
   save();
   closeRedeemModal();
@@ -3896,8 +4402,9 @@ document.getElementById('backup-file').addEventListener('change', event => {
 });
 
 document.getElementById('btn-reset').addEventListener('click', () => {
-  if (!confirm('确定清空所有教材和词组手册的打卡记录、进度、错题与评分吗？录音会保留。此操作不可恢复。')) return;
-  data = defaultData(); save();
+  if (!confirm('确定清空所有教材和词组手册的打卡记录、进度、错题与评分吗？录音会保留。此操作不可恢复。' + (cloudReady() ? '\n已开启云同步：其他设备的记录也会一起清空。' : ''))) return;
+  data = defaultData(); data.sync.resetAt = Date.now(); save();
+  if (cloudReady()) cloudSync();
   renderHeader(); initTodayScope(); renderToday(); initListControls(true); renderList(); initPracticeSelect(); resetPracticeWelcome(); initVoiceSelect(); voiceState.list = []; initDictSelect(); loadDictList(); renderRecord();
 });
 
@@ -3932,6 +4439,7 @@ initDictSelect();
 applyParentControls();
 startUsageTracking();
 registerPWA();
+initCloudSync();
 </script>
 </body>
 </html>
